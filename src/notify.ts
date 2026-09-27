@@ -131,6 +131,10 @@ export async function notify(ctx: Ctx, report: Report): Promise<void> {
   if (report.preset.toast) ctx.notifications.toast({ message: reportSummary(report), ok: accentFor(report) !== 'warn' });
   const results = await Promise.allSettled([sendDesktopAndVr(ctx, report), sendDiscord(ctx, report)]);
   for (const result of results) {
-    if (result.status === 'rejected') ctx.logger.warn(`Notification channel failed: ${String(result.reason)}`);
+    // The reason is passed through as well: a message alone loses the stack, and the one thing
+    // worth knowing about a channel that fails rarely is where it failed.
+    if (result.status === 'rejected') {
+      ctx.logger.warn(`Notification channel failed: ${String(result.reason)}`, result.reason);
+    }
   }
 }
