@@ -106,7 +106,7 @@ export class ReportPanel {
   }
 
   /**
-   * One pill per check, then who they were wearing and whether they have been here before.
+   * One pill per check.
    *
    * The pill's colour is the verdict, so the words are only what was found: `PC Very Poor`,
    * not `PC avatar rank: VeryPoor, needs Poor or better`. The emoji repeats the colour for
@@ -114,18 +114,18 @@ export class ReportPanel {
    */
   #pills(report: Report): readonly HTMLElement[] {
     const k = this.#ctx.ui.kit;
-    const { facts } = report;
     const pill = (check: Check): HTMLElement =>
       k.badge(VERDICT_TONE[check.verdict], `${VERDICT_EMOJI[check.verdict]} ${check.short}`);
-    const pills = report.evaluation.checks.map(pill);
-    if (facts.avatarName !== '') pills.push(k.badge('neutral', facts.avatarName));
-    const { seenHere, lastAt } = facts.rejoin;
-    if (seenHere === true) {
-      pills.push(k.badge('neutral', lastAt === undefined ? 'Seen here before' : `Seen ${timeAgo(lastAt)}`));
-    } else if (seenHere === false) {
-      pills.push(k.badge('neutral', 'First time here'));
-    }
-    return pills;
+    return report.evaluation.checks.map(pill);
+  }
+
+  /** Whether this is a face the instance has seen before — part of who they are, not a check. */
+  #rejoinPill(report: Report): HTMLElement | undefined {
+    const k = this.#ctx.ui.kit;
+    const { seenHere, lastAt } = report.facts.rejoin;
+    if (seenHere === false) return k.badge('neutral', 'First time here');
+    if (seenHere !== true) return undefined;
+    return k.badge('neutral', lastAt === undefined ? 'Seen here before' : `Seen ${timeAgo(lastAt)}`);
   }
 
   #reportRows(): readonly (HTMLElement | DocumentFragment)[] {
@@ -136,7 +136,7 @@ export class ReportPanel {
       const what = report.kind === 'avatar' ? ' · switched avatar' : '';
       const verdict = report.evaluation.verdict;
       return k.row({
-        label: `${time} · ${report.joiner.name} · ${report.preset.name}${what}`,
+        label: k.badges(`${time} · ${report.joiner.name} · ${report.preset.name}${what}`, this.#rejoinPill(report)),
         detail: k.badges(...this.#pills(report)),
         value: k.badge(VERDICT_TONE[verdict], VERDICT_TEXT[verdict]),
       });
