@@ -38,6 +38,7 @@ export const DEFAULT_EMBED = {
   url: '{profileUrl}',
   color: '{resultColor}',
   thumbnailUrl: '{avatarImageUrl}',
+  footerIconUrl: 'https://vrcnext.com/logo.png',
   footerText: 'VRCNext Club Security · {preset}{{ " · " + world if world else "" }}{{ " · " + instanceName if instanceName else "" }}',
   timestamp: true,
   fields: [
