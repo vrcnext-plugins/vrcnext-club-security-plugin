@@ -6,7 +6,7 @@
  * each with its own template or embed). The three numbers at the bottom are global.
  */
 
-import { INSTANCE_TYPES, PERFORMANCE_RANKS, type SettingsSchema, type SettingsValues } from '@vrcnext/plugin-api';
+import { INSTANCE_TYPES, PERFORMANCE_RANKS, instanceTypeLabel, type SettingsSchema, type SettingsValues } from '@vrcnext/plugin-api';
 
 /** The report as text: first line = title, rest = body. Used for toasts, desktop and VR. */
 export const DEFAULT_TEMPLATE = [
@@ -52,7 +52,8 @@ const RANK_OPTIONS = [
   ...[...PERFORMANCE_RANKS].reverse().map((rank) => ({ value: rank, label: `${rank} or better` })),
 ] as const;
 
-const INSTANCE_TYPE_OPTIONS = INSTANCE_TYPES.map((type) => ({ value: type, label: type })) as unknown as readonly { readonly value: (typeof INSTANCE_TYPES)[number]; readonly label: string }[];
+// The app's own names for the types, so a preset reads the way VRCNext's instance badges do.
+const INSTANCE_TYPE_OPTIONS = INSTANCE_TYPES.map((type) => ({ value: type, label: instanceTypeLabel(type) })) as unknown as readonly { readonly value: (typeof INSTANCE_TYPES)[number]; readonly label: string }[];
 
 /** One club. */
 export const preset = {
