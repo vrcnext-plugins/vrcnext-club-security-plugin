@@ -19,6 +19,8 @@ export type Verdict = 'met' | 'unverified' | 'failed';
 export interface Check {
   readonly key: 'age' | 'pcRank' | 'questRank' | 'group' | 'friend';
   readonly label: string;
+  /** Two or three words for a pill, where the colour already says whether it holds. */
+  readonly short: string;
   readonly verdict: Verdict;
   /** Why, in a few words. */
   readonly detail: string;
@@ -37,39 +39,53 @@ export const VERDICT_TEXT: Readonly<Record<Verdict, string>> = {
   failed: 'Requirements not met',
 };
 
+/** VRChat spells the worst rank `VeryPoor`; nobody says it that way. */
+export function rankText(rank: string): string {
+  return rank === '' ? 'Unknown' : rank.replace(/([a-z])([A-Z])/g, '$1 $2');
+}
+
 function ageCheck(facts: Facts): Check {
   const status = facts.ageVerificationStatus;
-  if (status === '18+') return { key: 'age', label: '18+ verified', verdict: 'met', detail: '18+' };
-  if (status === 'verified') return { key: 'age', label: '18+ verified', verdict: 'failed', detail: 'verified, not 18+' };
-  if (facts.ageVerified === true) return { key: 'age', label: '18+ verified', verdict: 'met', detail: 'verified' };
+  const label = '18+ verified';
+  const short = '18+';
+  if (status === '18+') return { key: 'age', label, short, verdict: 'met', detail: '18+' };
+  if (status === 'verified') return { key: 'age', label, short, verdict: 'failed', detail: 'verified, not 18+' };
+  if (facts.ageVerified === true) return { key: 'age', label, short, verdict: 'met', detail: 'verified' };
   const detail = status === 'hidden' ? 'hidden' : facts.ageVerified === false ? 'not verified' : 'unknown';
-  return { key: 'age', label: '18+ verified', verdict: 'unverified', detail };
+  return { key: 'age', label, short, verdict: 'unverified', detail };
 }
 
 function rankCheck(key: 'pcRank' | 'questRank', label: string, rank: string, minimum: string): Check {
+  const platform = key === 'pcRank' ? 'PC' : 'Quest';
   const have = rankIndex(rank);
   const want = rankIndex(minimum);
-  if (have === undefined || want === undefined) return { key, label, verdict: 'unverified', detail: 'rank unknown' };
+  if (have === undefined || want === undefined) {
+    return { key, label, short: `${platform} unknown`, verdict: 'unverified', detail: 'rank unknown' };
+  }
+  const short = `${platform} ${rankText(rank)}`;
   return have <= want
-    ? { key, label, verdict: 'met', detail: rank }
-    : { key, label, verdict: 'failed', detail: `${rank}, needs ${minimum} or better` };
+    ? { key, label, short, verdict: 'met', detail: rank }
+    : { key, label, short, verdict: 'failed', detail: `${rank}, needs ${minimum} or better` };
 }
 
 function groupCheck(facts: Facts, groupId: string): Check {
   const label = 'Group member';
-  if (facts.groupIds === undefined) return { key: 'group', label, verdict: 'unverified', detail: 'groups unknown' };
+  if (facts.groupIds === undefined) {
+    return { key: 'group', label, short: 'Group unknown', verdict: 'unverified', detail: 'groups unknown' };
+  }
   const member = facts.groupIds.some((id) => id.toLowerCase() === groupId.toLowerCase());
   return member
-    ? { key: 'group', label, verdict: 'met', detail: 'member' }
-    : { key: 'group', label, verdict: 'unverified', detail: 'not among visible memberships' };
+    ? { key: 'group', label, short: 'Group member', verdict: 'met', detail: 'member' }
+    : { key: 'group', label, short: 'Group member', verdict: 'unverified', detail: 'not among visible memberships' };
 }
 
 function friendCheck(facts: Facts): Check {
   const label = 'On friend list';
-  if (facts.isFriend === undefined) return { key: 'friend', label, verdict: 'unverified', detail: 'unknown' };
+  const short = 'Friend';
+  if (facts.isFriend === undefined) return { key: 'friend', label, short, verdict: 'unverified', detail: 'unknown' };
   return facts.isFriend
-    ? { key: 'friend', label, verdict: 'met', detail: 'friend' }
-    : { key: 'friend', label, verdict: 'failed', detail: 'not a friend' };
+    ? { key: 'friend', label, short, verdict: 'met', detail: 'friend' }
+    : { key: 'friend', label, short, verdict: 'failed', detail: 'not a friend' };
 }
 
 /** The worst verdict wins: one failure makes the report red, otherwise one unknown makes it orange. */

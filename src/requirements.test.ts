@@ -70,3 +70,12 @@ test('an avatar switch is judged on the avatar checks alone', () => {
   assert.deepEqual(avatarOnly.checks.map((c) => c.key), ['pcRank']);
   assert.equal(avatarOnly.verdict, 'failed');
 });
+
+test('every check names itself in the few words a pill can hold', () => {
+  const strict = preset({ requireAge: true, minPcRank: 'Poor', minQuestRank: 'Medium' });
+  const checks = evaluate(strict, facts({ pcRank: 'VeryPoor', questRank: 'Good' })).checks;
+  assert.deepEqual(checks.map((c) => c.short), ['18+', 'PC Very Poor', 'Quest Good']);
+
+  const unknown = evaluate(strict, facts({ pcRank: '', questRank: '' })).checks;
+  assert.deepEqual(unknown.map((c) => c.short), ['18+', 'PC unknown', 'Quest unknown']);
+});

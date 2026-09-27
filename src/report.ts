@@ -17,7 +17,7 @@ import {
 
 import { activityLog } from './activity.js';
 import type { Facts, Joiner } from './facts.js';
-import { VERDICT_COLOR, VERDICT_EMOJI, VERDICT_TEXT, type Evaluation } from './requirements.js';
+import { VERDICT_COLOR, VERDICT_EMOJI, VERDICT_TEXT, rankText, type Evaluation } from './requirements.js';
 import { DEFAULT_TEMPLATE, type Preset } from './settings.js';
 
 /** Why a report exists: someone arrived, or someone already here changed avatar. */
@@ -50,11 +50,6 @@ function yesNo(value: boolean | undefined, unknown = 'Unknown'): string {
 
 function triState(value: boolean | undefined, yes: string, no: string, unknown = '❔'): string {
   return value === undefined ? unknown : (value ? yes : no);
-}
-
-function rankText(rank: string): string {
-  // VRChat spells the worst rank `VeryPoor`; nobody says it that way.
-  return rank === '' ? 'Unknown' : rank.replace(/([a-z])([A-Z])/g, '$1 $2');
 }
 
 /** `https://vrchat.com/home/user/usr_…`, or `''` when there is no id to link to. */

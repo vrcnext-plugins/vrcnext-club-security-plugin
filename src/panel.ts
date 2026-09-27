@@ -3,11 +3,11 @@
  * Built from `ctx.ui.kit` so it is VRCNext's own markup and follows its theme.
  */
 
-import type { PluginContext, UiBadgeTone, VrcInstance } from '@vrcnext/plugin-api';
+import { timeAgo, type PluginContext, type UiBadgeTone, type VrcInstance } from '@vrcnext/plugin-api';
 
 import { describePreset, presetMatches } from './filters.js';
-import { reportLines, type Report } from './report.js';
-import { VERDICT_TEXT, type Verdict } from './requirements.js';
+import type { Report } from './report.js';
+import { VERDICT_EMOJI, VERDICT_TEXT, type Check, type Verdict } from './requirements.js';
 import type { Settings } from './settings.js';
 
 type Ctx = PluginContext<Settings>;
@@ -105,17 +105,39 @@ export class ReportPanel {
     return rows;
   }
 
+  /**
+   * One pill per check, then who they were wearing and whether they have been here before.
+   *
+   * The pill's colour is the verdict, so the words are only what was found: `PC Very Poor`,
+   * not `PC avatar rank: VeryPoor, needs Poor or better`. The emoji repeats the colour for
+   * anyone who cannot tell the two reds apart.
+   */
+  #pills(report: Report): readonly HTMLElement[] {
+    const k = this.#ctx.ui.kit;
+    const { facts } = report;
+    const pill = (check: Check): HTMLElement =>
+      k.badge(VERDICT_TONE[check.verdict], `${VERDICT_EMOJI[check.verdict]} ${check.short}`);
+    const pills = report.evaluation.checks.map(pill);
+    if (facts.avatarName !== '') pills.push(k.badge('neutral', facts.avatarName));
+    const { seenHere, lastAt } = facts.rejoin;
+    if (seenHere === true) {
+      pills.push(k.badge('neutral', lastAt === undefined ? 'Seen here before' : `Seen ${timeAgo(lastAt)}`));
+    } else if (seenHere === false) {
+      pills.push(k.badge('neutral', 'First time here'));
+    }
+    return pills;
+  }
+
   #reportRows(): readonly (HTMLElement | DocumentFragment)[] {
     const k = this.#ctx.ui.kit;
     if (this.#reports.length === 0) return [k.emptyState('No joins reported yet.')];
     return this.#reports.map((report) => {
-      const lines = reportLines(report, report.preset.template);
       const time = new Date(report.at).toLocaleTimeString();
       const what = report.kind === 'avatar' ? ' · switched avatar' : '';
       const verdict = report.evaluation.verdict;
       return k.row({
         label: `${time} · ${report.joiner.name} · ${report.preset.name}${what}`,
-        detail: lines.slice(1).join(' · '),
+        detail: k.badges(...this.#pills(report)),
         value: k.badge(VERDICT_TONE[verdict], VERDICT_TEXT[verdict]),
       });
     });
