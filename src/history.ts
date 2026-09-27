@@ -19,25 +19,33 @@ export interface Rejoin {
 export const UNKNOWN_REJOIN: Rejoin = { seenHere: undefined, lastAt: undefined };
 
 /**
- * Looks for an earlier event in the same instance. Events from this join are excluded by
- * timestamp: anything at or after `joinedAt` (with a few seconds of slack) describes this
- * visit, not an earlier one.
+ * Looks for an earlier, separate visit to this instance.
+ *
+ * Clock arithmetic cannot do this: the event that records *this* arrival is usually minutes
+ * old by the time a report is written — VRChat pushes the friend's GPS move before the log
+ * line reaches VRCNext, and a replay runs on someone standing in the instance right now.
+ * Treating any old event here as an earlier visit made every report a rejoin.
+ *
+ * So the question is asked as a person would: did they go somewhere else in between? The
+ * newest run of events in this instance describes the visit they are on. Only an event here
+ * that sits *behind* an event somewhere else is a visit they came back from. Events with no
+ * location — an avatar or status change — say nothing about where they were, and are skipped.
  */
 export function rejoinIn(
   events: readonly Pick<VrcTimelineEvent, 'timestamp' | 'location'>[] | undefined,
   location: string,
-  joinedAt: number,
 ): Rejoin {
   if (events === undefined) return UNKNOWN_REJOIN;
   const key = parseLocation(location).key;
   if (key === '') return { seenHere: false, lastAt: undefined };
-  const earlier = events
-    .filter((e) => parseLocation(e.location).key === key)
-    .filter((e) => {
-      const at = Date.parse(e.timestamp);
-      return Number.isFinite(at) && at < joinedAt - 5_000;
-    })
-    .sort((a, b) => Date.parse(b.timestamp) - Date.parse(a.timestamp));
-  const last = earlier[0];
-  return { seenHere: last !== undefined, lastAt: last?.timestamp };
+  const located = events
+    .map((event) => ({ at: Date.parse(event.timestamp), timestamp: event.timestamp, key: parseLocation(event.location).key }))
+    .filter((event) => event.key !== '' && Number.isFinite(event.at))
+    .sort((a, b) => b.at - a.at);
+  const wentElsewhere = located.findIndex((event) => event.key !== key);
+  if (wentElsewhere === -1) return { seenHere: false, lastAt: undefined };
+  const before = located.slice(wentElsewhere).find((event) => event.key === key);
+  return before === undefined
+    ? { seenHere: false, lastAt: undefined }
+    : { seenHere: true, lastAt: before.timestamp };
 }

@@ -110,7 +110,6 @@ export async function collectFacts(
 ): Promise<Facts> {
   if (joiner.userId === '') return UNKNOWN_FACTS;
   const signal = AbortSignal.any([options.signal, AbortSignal.timeout(options.deadlineMs)]);
-  const joinedAt = Date.now();
   const location = instance?.location ?? '';
   const [user, avatar, groups, timeline] = await Promise.all([
     vrchat.user(joiner.userId, { signal }),
@@ -126,7 +125,7 @@ export async function collectFacts(
     platform: user?.platform ?? inInstance?.platform ?? '',
     ...(avatar ?? { avatarId: '', avatarName: '', avatarImageUrl: '', pcRank: '', questRank: '' }),
     groupIds: groups,
-    rejoin: location === '' ? UNKNOWN_REJOIN : rejoinIn(timeline, location, joinedAt),
+    rejoin: location === '' ? UNKNOWN_REJOIN : rejoinIn(timeline, location),
     timeline,
     // Badges and uploaded content are not in what VRCNext pushes, so those criteria are left
     // out of the total rather than counted as failures.
