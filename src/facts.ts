@@ -74,6 +74,21 @@ async function avatarFacts(vrchat: VrchatApi, joiner: Joiner, instance: VrcInsta
   };
 }
 
+/**
+ * Just the avatar, for a player already here who changed into a new one. Nothing else is
+ * re-read: their age status and memberships did not change when their avatar did.
+ */
+export async function collectAvatarFacts(
+  vrchat: VrchatApi,
+  joiner: Joiner,
+  instance: VrcInstance | undefined,
+  signal: AbortSignal,
+): Promise<Facts> {
+  if (joiner.userId === '') return UNKNOWN_FACTS;
+  const avatar = await avatarFacts(vrchat, joiner, instance, signal).catch(() => undefined);
+  return { ...UNKNOWN_FACTS, ...(avatar ?? {}) };
+}
+
 /** Runs every lookup in parallel and returns whatever arrived before the deadline. */
 export async function collectFacts(
   vrchat: VrchatApi,

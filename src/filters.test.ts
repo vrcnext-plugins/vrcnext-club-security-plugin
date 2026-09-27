@@ -42,3 +42,15 @@ test('describePreset names what is restricted', () => {
   assert.equal(describePreset(preset()), 'every instance');
   assert.equal(describePreset(preset({ instanceTypes: ['group-plus'], group: GROUP, worlds: [WORLD, 'wrld_b'] })), 'types: group-plus · one group · 2 worlds');
 });
+
+test('a whitelisted player is skipped by that preset only', () => {
+  const staff = 'usr_11111111-2222-3333-4444-555555555555';
+  const club = preset({ name: 'Club', whitelist: [staff] });
+  const other = preset({ name: 'Other' });
+  const here = instance();
+
+  assert.deepEqual(matchingPresets([club, other], here, staff).map((p) => p.name), ['Other']);
+  assert.deepEqual(matchingPresets([club, other], here, 'usr_99999999-2222-3333-4444-555555555555').map((p) => p.name), ['Club', 'Other']);
+  // A legacy account with no id cannot be whitelisted, and is still reported.
+  assert.deepEqual(matchingPresets([club], here, '').map((p) => p.name), ['Club']);
+});

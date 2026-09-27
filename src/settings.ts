@@ -10,7 +10,7 @@ import { INSTANCE_TYPES, PERFORMANCE_RANKS, type SettingsSchema, type SettingsVa
 
 /** The report as text: first line = title, rest = body. Used for toasts, desktop and VR. */
 export const DEFAULT_TEMPLATE = [
-  '{resultEmoji} {name} {{ "is back" if rejoin else "joined" }} · {preset}',
+  '{resultEmoji} {name} {eventText} · {preset}',
   '{checksText}',
   'Avatar: {avatar} (PC {pcRankText} · Quest {questRankText})',
   '{{ "Seen here before, " + rejoinAgo if rejoin else "" }}',
@@ -18,13 +18,13 @@ export const DEFAULT_TEMPLATE = [
 
 /** The same, without emoji: WayVR draws with one font and shows nothing for symbols. */
 export const DEFAULT_TEMPLATE_VR = [
-  '{name} {{ "is back" if rejoin else "joined" }}: {resultText}',
+  '{name} {eventText}: {resultText}',
   '{checksPlainText}',
 ].join('\n');
 
 /** The report as a Discord embed. Every text is a template; `{resultColor}` colours the bar. */
 export const DEFAULT_EMBED = {
-  title: '{resultEmoji} {name} {{ "is back" if rejoin else "joined" }}',
+  title: '{resultEmoji} {name} {eventText}',
   description: '{checksText}',
   color: '{resultColor}',
   thumbnailUrl: '{avatarImageUrl}',
@@ -39,7 +39,7 @@ export const DEFAULT_EMBED = {
 
 /** Names a template may use. Listed under the editors so the user can see them. */
 export const TEMPLATE_VARIABLES = [
-  'name', 'playerId', 'preset', 'result', 'resultText', 'resultEmoji', 'resultColor', 'checksText', 'checksPlainText',
+  'name', 'playerId', 'preset', 'event', 'eventText', 'result', 'resultText', 'resultEmoji', 'resultColor', 'checksText', 'checksPlainText',
   'failedText', 'unverifiedText', 'ageVerified', 'ageVerifiedText', 'ageVerifiedEmoji', 'ageStatus',
   'pcRank', 'pcRankText', 'pcRankEmoji', 'questRank', 'questRankText', 'questRankEmoji',
   'avatar', 'avatarId', 'avatarImageUrl', 'platform', 'platformEmoji', 'isFriend', 'friendText',
@@ -106,6 +106,22 @@ export const preset = {
     default: '',
   },
   requireFriend: { kind: 'boolean', label: 'Must be on my friend list', default: false },
+  whitelist: {
+    kind: 'user',
+    label: 'Never check these people',
+    description: 'Staff, DJs, yourself on a second account. They join and switch avatars without a report.',
+    default: [],
+    multiple: true,
+    scopes: ['friends', 'favorites', 'recent', 'instance', 'search'],
+  },
+
+  watchAvatarChanges: {
+    kind: 'boolean',
+    label: 'Warn when someone here switches avatar',
+    description:
+      'Re-checks the avatar limits above against the new avatar: within the limits is green, an unknown rank orange, over them red. Only this preset’s avatar requirements are checked, not age or membership.',
+    default: false,
+  },
 
   toast: { kind: 'boolean', label: 'In-app toast', default: true },
   desktop: { kind: 'boolean', label: 'Desktop notification', default: true },
@@ -165,6 +181,7 @@ export const settings = {
     min: 3,
     max: 120,
     step: 1,
+    integer: true,
     unit: 's',
     slider: true,
   },
@@ -173,7 +190,9 @@ export const settings = {
     label: 'Seconds to wait for details',
     description: 'How long to give VRCNext for the profile, avatar and groups before reporting what is known.',
     default: 25,
-    markers: [5, 10, 15, 25, 40, 60],
+    min: 1,
+    markers: [1, 5, 10, 15, 25, 40, 60],
+    integer: true,
     unit: 's',
   },
   notifyTimeoutSecs: {
@@ -183,6 +202,7 @@ export const settings = {
     min: 1,
     max: 60,
     step: 1,
+    integer: true,
     unit: 's',
     slider: true,
   },

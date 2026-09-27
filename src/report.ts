@@ -18,8 +18,13 @@ import type { Facts, Joiner } from './facts.js';
 import { VERDICT_COLOR, VERDICT_EMOJI, VERDICT_TEXT, type Evaluation } from './requirements.js';
 import { DEFAULT_TEMPLATE, type Preset } from './settings.js';
 
+/** Why a report exists: someone arrived, or someone already here changed avatar. */
+export type ReportKind = 'join' | 'avatar';
+
 export interface Report {
   readonly at: number;
+  /** `join` unless stated; an `avatar` report only carries the avatar checks. */
+  readonly kind?: ReportKind;
   readonly preset: Preset;
   readonly joiner: Joiner;
   readonly instance: VrcInstance;
@@ -67,9 +72,12 @@ export function reportValues(report: Report): TemplateValues {
   const inGroup = groupVerdict === 'met' ? true : groupVerdict === 'failed' ? false : undefined;
   const failed = evaluation.checks.filter((c) => c.verdict === 'failed');
   const unverified = evaluation.checks.filter((c) => c.verdict === 'unverified');
+  const kind = report.kind ?? 'join';
   return {
     name: joiner.name,
     playerId: joiner.userId,
+    event: kind,
+    eventText: kind === 'avatar' ? 'switched avatar' : facts.rejoin.seenHere === true ? 'is back' : 'joined',
     userId: joiner.userId,
     preset: preset.name,
     result: evaluation.verdict,
@@ -144,5 +152,6 @@ export function reportSummary(report: Report): string {
     `Quest ${rankText(facts.questRank).replace('Unknown', '?')}`,
     facts.rejoin.seenHere === undefined ? 'rejoin ?' : (facts.rejoin.seenHere ? 'rejoin' : 'new'),
   ];
-  return `${VERDICT_EMOJI[evaluation.verdict]} ${report.joiner.name} joined (${report.preset.name}) · ${bits.join(' · ')}`;
+  const what = report.kind === 'avatar' ? 'switched avatar' : 'joined';
+  return `${VERDICT_EMOJI[evaluation.verdict]} ${report.joiner.name} ${what} (${report.preset.name}) · ${bits.join(' · ')}`;
 }

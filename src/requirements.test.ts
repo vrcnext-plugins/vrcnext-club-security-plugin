@@ -4,7 +4,7 @@ import { test } from 'vitest';
 import { defaultsFor } from '@vrcnext/plugin-api';
 
 import type { Facts } from './facts.js';
-import { evaluate, worst } from './requirements.js';
+import { AVATAR_CHECKS, evaluate, worst } from './requirements.js';
 import { preset as presetSchema, type Preset } from './settings.js';
 
 function facts(overrides: Partial<Facts> = {}): Facts {
@@ -56,4 +56,16 @@ test('a preset with no requirements is met, and the worst verdict wins', () => {
   assert.equal(worst(['met', 'unverified', 'failed']), 'failed');
   assert.equal(worst(['met', 'unverified']), 'unverified');
   assert.equal(worst([]), 'met');
+});
+
+test('an avatar switch is judged on the avatar checks alone', () => {
+  const strict = preset({ requireAge: true, requireFriend: true, minPcRank: 'Medium' });
+  const worn = facts({ pcRank: 'VeryPoor' });
+
+  const full = evaluate(strict, worn);
+  assert.ok(full.checks.length > 1);
+
+  const avatarOnly = evaluate(strict, worn, { only: AVATAR_CHECKS });
+  assert.deepEqual(avatarOnly.checks.map((c) => c.key), ['pcRank']);
+  assert.equal(avatarOnly.verdict, 'failed');
 });

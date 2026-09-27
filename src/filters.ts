@@ -16,9 +16,17 @@ export function presetMatches(preset: Preset, instance: InstanceShape): boolean 
   return true;
 }
 
-/** The enabled presets that match, in order. */
-export function matchingPresets(presets: readonly Preset[], instance: InstanceShape): readonly Preset[] {
-  return presets.filter((p) => p.enabled && presetMatches(p, instance));
+/**
+ * The enabled presets that match, in order. A preset that whitelisted `userId` is left out:
+ * whitelisting is per preset, because one club's staff is another club's guest.
+ */
+export function matchingPresets(presets: readonly Preset[], instance: InstanceShape, userId = ''): readonly Preset[] {
+  return presets.filter((p) => p.enabled && presetMatches(p, instance) && !isWhitelisted(p, userId));
+}
+
+/** Whether this preset never checks that player. An empty id is nobody, so never whitelisted. */
+export function isWhitelisted(preset: Preset, userId: string): boolean {
+  return userId !== '' && preset.whitelist.includes(userId);
 }
 
 /** One line for the status card: what a preset restricts to. */

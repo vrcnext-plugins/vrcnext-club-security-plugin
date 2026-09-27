@@ -24,8 +24,30 @@ The verdict reaches your templates as `{result}`, `{resultText}`, `{resultEmoji}
 | Identity | Preset name, Enabled | The name appears in every report as `{preset}`. |
 | Filters | Instance types, Group, Worlds | One of each kind. Empty means "any". A pickable group and worlds, not pasted ids. |
 | Requirements | Require 18+, PC / Quest avatar rank at least, Must be a member of, Must be on my friend list | Each one becomes a check with its own verdict. |
+| Exceptions | Never check these people | Picked from your friends, favourites or the instance. Staff join and change avatar without a report. |
+| Avatars | Warn when someone here switches avatar | Re-checks the avatar limits alone against the new avatar. |
 | Channels | In-app toast, Desktop, VR overlay, Discord | Per preset, so a strict club can post to Discord while a relaxed one only toasts. |
 | Formats | Report template, VR overlay template, Discord embed | The text report, the plain-text one for VR, and the embed. |
+
+## Avatar switches
+
+A club's avatar rules are usually broken *after* the door, by someone who came in on a light
+avatar and changed. With **Warn when someone here switches avatar** on, a preset re-checks its
+PC and Quest limits whenever a player already in your instance changes into another avatar, and
+reports it with the same three colours. Nothing else is re-read — their age status and their
+memberships did not change with their avatar — so the report carries the avatar checks only.
+
+VRChat's log says nothing about other people's avatars, so this comes from the instance VRCNext
+already keeps: a switch is noticed at the next refresh, within about half a minute.
+
+## Testing the channels
+
+**Replay last join** takes the most recent player VRCNext recorded near you and runs them
+through every enabled preset again, each with its own requirements, so the test shows what that
+preset would really have reported. It reads VRCNext's own records — the recent players and
+their timeline — so it works with VRChat closed, which is when a webhook is usually being set
+up. Filters are not applied, because the point is to exercise the channels; a preset that would
+not have watched that instance says so in the plugin log.
 
 ## The default report
 

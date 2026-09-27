@@ -11,11 +11,12 @@
 
 import { definePlugin, type PluginContext, type PluginId, type VrcInstance } from '@vrcnext/plugin-api';
 
-import { collectFacts, type Joiner } from './src/facts.js';
-import { matchingPresets } from './src/filters.js';
+import { collectAvatarFacts, collectFacts, type Joiner } from './src/facts.js';
+import { matchingPresets, presetMatches } from './src/filters.js';
 import { notify } from './src/notify.js';
 import { ReportPanel } from './src/panel.js';
-import { evaluate } from './src/requirements.js';
+import { lastJoin } from './src/replay.js';
+import { AVATAR_CHECKS, evaluate } from './src/requirements.js';
 import { type Report } from './src/report.js';
 import { settings, type Preset } from './src/settings.js';
 
@@ -31,6 +32,8 @@ class ClubSecurity {
   readonly #ctx: Ctx;
   readonly #panel: ReportPanel;
   #instance: VrcInstance | undefined;
+  /** The avatar each player here was last seen in, so a switch can be noticed on a refresh. */
+  readonly #avatars = new Map<string, string>();
   /** Joiners currently being looked up, so a duplicate log line does not produce two reports. */
   readonly #inFlight = new Set<string>();
   /**
@@ -64,11 +67,62 @@ class ClubSecurity {
 
   async #refreshInstance(): Promise<void> {
     try {
-      this.#instance = await this.#ctx.vrchat.currentInstance({ cached: false, signal: this.#ctx.signal });
+      const instance = await this.#ctx.vrchat.currentInstance({ cached: false, signal: this.#ctx.signal });
+      const previous = this.#instance;
+      this.#instance = instance;
+      if (instance !== undefined) {
+        if (previous !== undefined && previous.location !== instance.location) this.#avatars.clear();
+        this.#noteAvatars(instance);
+      }
     } catch (error) {
       this.#ctx.logger.debug(`Current instance not available: ${String(error)}`);
     }
     this.#panel.refresh();
+  }
+
+  /**
+   * Records who wears what, and reports a change.
+   *
+   * VRChat's log says nothing about someone else changing avatar, so this comes from the
+   * instance the host mirrors: a player whose `avatarId` differs from the one last seen here
+   * switched. The first sighting only records, because there is nothing to compare it with.
+   */
+  #noteAvatars(instance: VrcInstance): void {
+    const self = this.#ctx.vrchat.self();
+    for (const user of instance.users) {
+      if (user.avatarId === '' || user.id === '') continue;
+      const before = this.#avatars.get(user.id);
+      this.#avatars.set(user.id, user.avatarId);
+      if (before === undefined || before === user.avatarId) continue;
+      if (user.id === self?.id) continue;
+      void this.#onAvatarChange({ name: user.displayName, userId: user.id }, instance);
+    }
+    // Someone who left should not keep a slot; their next join records afresh.
+    const here = new Set(instance.users.map((u) => u.id));
+    for (const id of [...this.#avatars.keys()]) {
+      if (!here.has(id)) this.#avatars.delete(id);
+    }
+  }
+
+  /** The avatar limits, re-checked against what they changed into. */
+  async #onAvatarChange(joiner: Joiner, instance: VrcInstance): Promise<void> {
+    const presets = this.#presetsFor(joiner, instance).filter((p) => p.watchAvatarChanges);
+    if (presets.length === 0) return;
+    try {
+      const facts = await collectAvatarFacts(this.#ctx.vrchat, joiner, instance, this.#ctx.signal);
+      for (const preset of presets) {
+        const evaluation = evaluate(preset, facts, { only: AVATAR_CHECKS });
+        if (evaluation.checks.length === 0) continue;
+        await this.#send({ at: Date.now(), kind: 'avatar', preset, joiner, instance, facts, evaluation });
+      }
+    } catch (error) {
+      this.#ctx.logger.error(`Avatar change for ${joiner.name} could not be checked: ${String(error)}`);
+    }
+  }
+
+  /** The presets watching this instance that have not whitelisted this player. */
+  #presetsFor(joiner: Joiner, instance: VrcInstance): readonly Preset[] {
+    return matchingPresets(this.#ctx.settings.get('presets'), instance, joiner.userId);
   }
 
   #startSettling(): void {
@@ -102,7 +156,7 @@ class ClubSecurity {
         return;
       }
       this.#instance = instance;
-      const presets = matchingPresets(this.#ctx.settings.get('presets'), instance);
+      const presets = this.#presetsFor(joiner, instance);
       if (presets.length === 0) return;
       await this.#report(joiner, instance, presets, this.#ctx.settings.get('collectTimeoutSecs') * 1000);
     } catch (error) {
@@ -120,30 +174,59 @@ class ClubSecurity {
       wantsGroups: presets.some((p) => p.requiredGroup !== ''),
     });
     for (const preset of presets) {
-      const report: Report = { at: Date.now(), preset, joiner, instance, facts, evaluation: evaluate(preset, facts) };
-      this.#panel.push(report);
-      this.#ctx.logger.info(`${preset.name}: ${joiner.name} — ${report.evaluation.verdict}` +
-        (report.evaluation.checks.length === 0 ? '' : ` (${report.evaluation.checks.map((c) => `${c.label}: ${c.detail}`).join(', ')})`));
-      await notify(this.#ctx, report);
+      await this.#send({ at: Date.now(), kind: 'join', preset, joiner, instance, facts, evaluation: evaluate(preset, facts) });
     }
   }
 
-  /** A report built from your own account in the current instance, to check the channels. */
+  /** Shows a report in the panel, writes it to the log and fans it out to the channels. */
+  async #send(report: Report): Promise<void> {
+    this.#panel.push(report);
+    const what = report.kind === 'avatar' ? 'switched avatar' : 'joined';
+    this.#ctx.logger.info(`${report.preset.name}: ${report.joiner.name} ${what} — ${report.evaluation.verdict}` +
+      (report.evaluation.checks.length === 0 ? '' : ` (${report.evaluation.checks.map((c) => `${c.label}: ${c.detail}`).join(', ')})`));
+    await notify(this.#ctx, report);
+  }
+
+  /**
+   * The last join VRCNext recorded, replayed through every enabled preset.
+   *
+   * Each preset evaluates the same real player with its own requirements, so the test shows
+   * what that preset would actually have reported rather than a made-up verdict. Filters are
+   * not applied — the point is to exercise the channels — and a preset whose filters would not
+   * have matched says so in the log.
+   */
   async #sendTest(): Promise<void> {
-    await this.#refreshInstance();
-    const instance = this.#instance;
-    const self = this.#ctx.vrchat.self();
-    if (instance === undefined || self === undefined) {
-      this.#ctx.notifications.toast({ message: 'Join an instance first; the test uses it.', ok: false });
-      return;
-    }
-    const presets = matchingPresets(this.#ctx.settings.get('presets'), instance);
+    const presets = this.#ctx.settings.get('presets').filter((preset) => preset.enabled);
     if (presets.length === 0) {
-      this.#ctx.notifications.toast({ message: 'No enabled preset matches this instance.', ok: false });
+      this.#ctx.notifications.toast({ message: 'No enabled preset to test.', ok: false });
       return;
     }
-    await this.#report({ name: self.displayName, userId: self.id }, instance, presets, 10_000);
-    this.#ctx.notifications.toast({ message: `Test report sent through ${String(presets.length)} preset(s).` });
+    const replay = await lastJoin({
+      vrchat: this.#ctx.vrchat,
+      signal: this.#ctx.signal,
+      currentInstance: this.#instance,
+    });
+    if (replay === undefined) {
+      this.#ctx.notifications.toast({ message: 'VRCNext has not recorded anyone yet; nothing to replay.', ok: false });
+      return;
+    }
+    const { joiner, instance } = replay;
+    if (!replay.located) this.#ctx.logger.warn(`Where ${joiner.name} was met is not recorded; the world and instance placeholders will be empty.`);
+
+    const facts = await collectFacts(this.#ctx.vrchat, joiner, instance, {
+      deadlineMs: this.#ctx.settings.get('collectTimeoutSecs') * 1000,
+      signal: this.#ctx.signal,
+      wantsGroups: presets.some((p) => p.requiredGroup !== ''),
+    });
+    for (const preset of presets) {
+      if (!presetMatches(preset, instance)) {
+        this.#ctx.logger.info(`Test: "${preset.name}" would not have watched this instance; reporting anyway.`);
+      }
+      await this.#send({ at: Date.now(), kind: 'join', preset, joiner, instance, facts, evaluation: evaluate(preset, facts) });
+    }
+    this.#ctx.notifications.toast({
+      message: `Replayed ${joiner.name} through ${String(presets.length)} preset(s).`,
+    });
   }
 }
 

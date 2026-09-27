@@ -79,12 +79,21 @@ export function worst(verdicts: readonly Verdict[]): Verdict {
   return 'met';
 }
 
-export function evaluate(preset: Preset, facts: Facts): Evaluation {
+/** The two checks that describe an avatar, which is all an avatar switch can be judged on. */
+export const AVATAR_CHECKS: readonly Check['key'][] = ['pcRank', 'questRank'];
+
+export interface EvaluateOptions {
+  /** Only these checks; the rest are not run and not reported. Everything, when absent. */
+  readonly only?: readonly Check['key'][];
+}
+
+export function evaluate(preset: Preset, facts: Facts, options: EvaluateOptions = {}): Evaluation {
+  const wanted = (key: Check['key']): boolean => options.only === undefined || options.only.includes(key);
   const checks: Check[] = [];
-  if (preset.requireAge) checks.push(ageCheck(facts));
-  if (preset.minPcRank !== 'any') checks.push(rankCheck('pcRank', 'PC avatar rank', facts.pcRank, preset.minPcRank));
-  if (preset.minQuestRank !== 'any') checks.push(rankCheck('questRank', 'Quest avatar rank', facts.questRank, preset.minQuestRank));
-  if (preset.requiredGroup !== '') checks.push(groupCheck(facts, preset.requiredGroup));
-  if (preset.requireFriend) checks.push(friendCheck(facts));
+  if (preset.requireAge && wanted('age')) checks.push(ageCheck(facts));
+  if (preset.minPcRank !== 'any' && wanted('pcRank')) checks.push(rankCheck('pcRank', 'PC avatar rank', facts.pcRank, preset.minPcRank));
+  if (preset.minQuestRank !== 'any' && wanted('questRank')) checks.push(rankCheck('questRank', 'Quest avatar rank', facts.questRank, preset.minQuestRank));
+  if (preset.requiredGroup !== '' && wanted('group')) checks.push(groupCheck(facts, preset.requiredGroup));
+  if (preset.requireFriend && wanted('friend')) checks.push(friendCheck(facts));
   return { verdict: worst(checks.map((c) => c.verdict)), checks };
 }

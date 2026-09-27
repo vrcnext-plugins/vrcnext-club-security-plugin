@@ -45,7 +45,7 @@ export class ReportPanel {
       icon: 'security',
       render: (card) => {
         card.appendChild(this.#ctx.ui.kit.description(
-          'A join is reported once per enabled preset whose filters match the instance. Test the channels from the Club Security tab.',
+          'A join is reported once per enabled preset whose filters match the instance, and whitelisted players are skipped. Test the channels from the Club Security tab.',
         ));
       },
     });
@@ -72,10 +72,10 @@ export class ReportPanel {
       title: 'Actions',
       icon: 'build',
       children: [
-        k.description('A test report uses the current instance and your own account, and goes through every preset that matches it.'),
+        k.description('A test replays the last player VRCNext recorded through every enabled preset, each with its own requirements. It reads VRCNext’s own records, so it works with VRChat closed.'),
         k.description('Green: every requirement verified. Orange: something could not be checked. Red: a requirement was checked and not met.'),
         k.buttonRow(
-          k.button({ label: 'Send test report', icon: 'send', onClick: () => { void this.#deps.sendTest(); } }),
+          k.button({ label: 'Replay last join', icon: 'send', onClick: () => { void this.#deps.sendTest(); } }),
         ),
       ],
     });
@@ -87,7 +87,7 @@ export class ReportPanel {
     const k = this.#ctx.ui.kit;
     const presets = this.#ctx.settings.get('presets');
     const instance = this.#deps.currentInstance();
-    if (presets.length === 0) return [k.emptyState('No presets yet. Add one in Settings → Plugins → Club Security.')];
+    if (presets.length === 0) return [k.emptyState('No presets yet. Add one in Settings → Club Security.')];
     const rows = presets.map((preset) => {
       const matches = instance !== undefined && preset.enabled && presetMatches(preset, instance);
       const channels = [preset.toast && 'toast', preset.desktop && 'desktop', preset.vr && 'VR', preset.discord.enabled && 'Discord']
@@ -111,9 +111,10 @@ export class ReportPanel {
     return this.#reports.map((report) => {
       const lines = reportLines(report, report.preset.template);
       const time = new Date(report.at).toLocaleTimeString();
+      const what = report.kind === 'avatar' ? ' · switched avatar' : '';
       const verdict = report.evaluation.verdict;
       return k.row({
-        label: `${time} · ${report.joiner.name} · ${report.preset.name}`,
+        label: `${time} · ${report.joiner.name} · ${report.preset.name}${what}`,
         detail: lines.slice(1).join(' · '),
         value: k.badge(VERDICT_TONE[verdict], VERDICT_TEXT[verdict]),
       });
