@@ -22,18 +22,28 @@ export const DEFAULT_TEMPLATE_VR = [
   '{checksPlainText}',
 ].join('\n');
 
-/** The report as a Discord embed. Every text is a template; `{resultColor}` colours the bar. */
+/**
+ * The report as a Discord embed.
+ *
+ * Every text is a template. The shape is built for a moderator glancing at a phone: who it is
+ * and a link to their profile in the title, the avatar as the thumbnail, the requirements and
+ * the avatar side by side, and what VRCNext has seen them do underneath. `{resultColor}`
+ * colours the bar green, orange or red.
+ *
+ * A field whose value renders empty is dropped, so the log disappears on a player VRCNext has
+ * no history for rather than showing an empty box.
+ */
 export const DEFAULT_EMBED = {
-  title: '{resultEmoji} {name} {eventText}',
-  description: '{checksText}',
+  title: '{name} {eventText}',
+  url: '{profileUrl}',
   color: '{resultColor}',
   thumbnailUrl: '{avatarImageUrl}',
-  footerText: '{preset} · {world} · {instanceType}',
+  footerText: 'VRCNext Club Security · {preset}{{ " · " + world if world else "" }}{{ " · " + instanceName if instanceName else "" }}',
   timestamp: true,
   fields: [
-    { name: 'Avatar', value: '{avatar}', inline: true },
-    { name: 'PC / Quest', value: '{pcRankEmoji} {pcRankText} / {questRankEmoji} {questRankText}', inline: true },
-    { name: 'Rejoin', value: '{{ rejoinText }}', inline: true },
+    { name: 'Requirements', value: '{requirementsText}', inline: true },
+    { name: 'Avatar', value: '{{ avatarLink if avatarLink else "Unknown" }}\n{ranksText}', inline: true },
+    { name: 'Recently', value: '{logText}', inline: false },
   ],
 } as const;
 
@@ -42,9 +52,11 @@ export const TEMPLATE_VARIABLES = [
   'name', 'playerId', 'preset', 'event', 'eventText', 'result', 'resultText', 'resultEmoji', 'resultColor', 'checksText', 'checksPlainText',
   'failedText', 'unverifiedText', 'ageVerified', 'ageVerifiedText', 'ageVerifiedEmoji', 'ageStatus',
   'pcRank', 'pcRankText', 'pcRankEmoji', 'questRank', 'questRankText', 'questRankEmoji',
-  'avatar', 'avatarId', 'avatarImageUrl', 'platform', 'platformEmoji', 'isFriend', 'friendText',
+  'avatar', 'avatarId', 'avatarImageUrl', 'avatarUrl', 'avatarLink', 'ranksText', 'requirementsText', 'logText',
+  'profileUrl', 'platform', 'platformEmoji', 'isFriend', 'friendText',
   'inGroup', 'inGroupText', 'inGroupEmoji', 'rejoin', 'rejoinText', 'rejoinEmoji', 'rejoinAgo', 'rejoinSince',
-  'world', 'worldId', 'instanceType', 'instanceId', 'location', 'time', 'date', 'timestamp',
+  'world', 'worldId', 'worldUrl', 'instanceType', 'instanceTypeText', 'instanceId', 'instanceName',
+  'location', 'time', 'date', 'timestamp',
 ] as const;
 
 const RANK_OPTIONS = [

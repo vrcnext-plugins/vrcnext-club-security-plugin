@@ -20,6 +20,7 @@ function facts(overrides: Partial<Facts> = {}): Facts {
     questRank: 'Poor',
     groupIds: ['grp_a'],
     rejoin: { seenHere: false, lastAt: undefined },
+    timeline: undefined,
     ...overrides,
   };
 }

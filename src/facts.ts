@@ -7,7 +7,7 @@
  * parallel and each one degrades to "unknown" on its own rather than holding up the report.
  */
 
-import type { PerformanceRank, VrcInstance, VrchatApi } from '@vrcnext/plugin-api';
+import type { PerformanceRank, VrcInstance, VrcTimelineEvent, VrchatApi } from '@vrcnext/plugin-api';
 
 import { rejoinIn, UNKNOWN_REJOIN, type Rejoin } from './history.js';
 
@@ -31,6 +31,11 @@ export interface Facts {
   /** Groups the player shows publicly; `undefined` when VRCNext did not answer. */
   readonly groupIds: readonly string[] | undefined;
   readonly rejoin: Rejoin;
+  /**
+   * VRCNext's own recent records for this player, newest first. Used for the rejoin check and
+   * for the short activity log a report may show; `undefined` when VRCNext did not answer.
+   */
+  readonly timeline: readonly VrcTimelineEvent[] | undefined;
 }
 
 export const UNKNOWN_FACTS: Facts = {
@@ -45,6 +50,7 @@ export const UNKNOWN_FACTS: Facts = {
   questRank: '',
   groupIds: undefined,
   rejoin: UNKNOWN_REJOIN,
+  timeline: undefined,
 };
 
 export interface CollectOptions {
@@ -104,7 +110,7 @@ export async function collectFacts(
     vrchat.user(joiner.userId, { signal }),
     avatarFacts(vrchat, joiner, instance, signal).catch(() => undefined),
     options.wantsGroups ? vrchat.userGroups(joiner.userId, { signal }).then((g) => g.map((x) => x.id), () => undefined) : Promise.resolve(undefined),
-    location === '' ? Promise.resolve(undefined) : vrchat.userTimeline(joiner.userId, { signal }).catch(() => undefined),
+    vrchat.userTimeline(joiner.userId, { signal }).catch(() => undefined),
   ]);
   const inInstance = instance?.users.find((u) => u.id === joiner.userId);
   return {
@@ -115,5 +121,6 @@ export async function collectFacts(
     ...(avatar ?? { avatarId: '', avatarName: '', avatarImageUrl: '', pcRank: '', questRank: '' }),
     groupIds: groups,
     rejoin: location === '' ? UNKNOWN_REJOIN : rejoinIn(timeline, location, joinedAt),
+    timeline,
   };
 }

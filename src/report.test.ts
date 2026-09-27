@@ -22,6 +22,7 @@ function facts(overrides: Partial<Facts> = {}): Facts {
     questRank: 'Poor',
     groupIds: ['grp_a'],
     rejoin: { seenHere: false, lastAt: undefined },
+    timeline: undefined,
     ...overrides,
   };
 }
@@ -62,11 +63,50 @@ test('verdict variables follow the worst check', () => {
 test('the default embed renders with the verdict colour and the avatar thumbnail', () => {
   const embed = renderEmbed(completeEmbed(DEFAULT_EMBED), reportValues(report()), { at: new Date(0) });
   assert.ok(embed !== undefined);
-  assert.equal(embed.title, '✅ Tupper joined');
+  assert.equal(embed.title, 'Tupper joined');
+  assert.equal(embed.url, 'https://vrchat.com/home/user/usr_1');
   assert.equal(embed.color, 0x3ba55d);
   assert.deepEqual(embed.thumbnail, { url: 'https://img.test/a.png' });
-  assert.equal(embed.fields?.[2]?.value, 'No');
-  assert.match(embed.footer?.text ?? '', /Club · The Club · group-public/);
+  assert.equal(embed.footer?.text, 'VRCNext Club Security · Club · The Club · #1 · Group Public');
+});
+
+test('the embed puts the requirements and the avatar side by side', () => {
+  const embed = renderEmbed(
+    completeEmbed(DEFAULT_EMBED),
+    reportValues(report({}, { pcRank: 'VeryPoor', groupIds: undefined })),
+    { at: new Date(0) },
+  );
+  assert.ok(embed !== undefined);
+  const fields = embed.fields ?? [];
+  const requirements = fields[0];
+  const avatar = fields[1];
+  assert.ok(requirements !== undefined && avatar !== undefined);
+  // A check that passed says so with a tick; one that did not carries the reason, in bold.
+  assert.equal(
+    requirements.value,
+    '18+ verified: ✅\nPC avatar rank: ⛔ **VeryPoor, needs Medium or better**\nGroup member: ⚠️ **groups unknown**',
+  );
+  assert.equal(requirements.inline, true);
+  assert.equal(avatar.value, '["Ava"](https://vrchat.com/home/avatar/avtr_1)\n- 🖥️ PC: 🔴 Very Poor\n- 📱 Quest: 🟠 Poor');
+});
+
+test('the activity field is dropped when VRCNext has no history for the player', () => {
+  const withLog = renderEmbed(
+    completeEmbed(DEFAULT_EMBED),
+    reportValues(report({}, {
+      timeline: [{ type: 'friend_avatar', timestamp: '2026-09-27T10:00:00Z', location: '', worldName: '' }],
+    })),
+    { at: new Date(0) },
+  );
+  assert.ok(withLog !== undefined);
+  const logged = withLog.fields ?? [];
+  assert.equal(logged.length, 3);
+  assert.equal(logged[2]?.value, '- <t:1790503200:R>: changed avatar');
+
+  // `renderEmbed` drops a field that rendered empty, so a stranger's report is two fields.
+  const without = renderEmbed(completeEmbed(DEFAULT_EMBED), reportValues(report()), { at: new Date(0) });
+  assert.ok(without !== undefined);
+  assert.equal((without.fields ?? []).length, 2);
 });
 
 test('a custom template picks its own facts; a broken one falls back and reports', () => {

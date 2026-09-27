@@ -8,12 +8,14 @@
 
 import {
   TemplateError,
+  instanceTypeLabel,
   renderTemplate,
   timeAgo,
   type TemplateValues,
   type VrcInstance,
 } from '@vrcnext/plugin-api';
 
+import { activityLog } from './activity.js';
 import type { Facts, Joiner } from './facts.js';
 import { VERDICT_COLOR, VERDICT_EMOJI, VERDICT_TEXT, type Evaluation } from './requirements.js';
 import { DEFAULT_TEMPLATE, type Preset } from './settings.js';
@@ -51,7 +53,40 @@ function triState(value: boolean | undefined, yes: string, no: string, unknown =
 }
 
 function rankText(rank: string): string {
-  return rank === '' ? 'Unknown' : rank;
+  // VRChat spells the worst rank `VeryPoor`; nobody says it that way.
+  return rank === '' ? 'Unknown' : rank.replace(/([a-z])([A-Z])/g, '$1 $2');
+}
+
+/** `https://vrchat.com/home/user/usr_…`, or `''` when there is no id to link to. */
+function vrchatUrl(kind: 'user' | 'avatar' | 'world' | 'group', id: string): string {
+  return id === '' ? '' : `https://vrchat.com/home/${kind}/${id}`;
+}
+
+/**
+ * The checks as Discord lines: `18+ verified: ✅`, `PC avatar rank: ⛔ **Very Poor**`.
+ *
+ * A check that passed needs no words — the tick says it. One that did not is the reason the
+ * report was worth reading, so its detail is bold.
+ */
+function requirementsText(checks: Evaluation['checks']): string {
+  return checks
+    .map((check) => {
+      const emoji = VERDICT_EMOJI[check.verdict];
+      const label = check.label.charAt(0).toUpperCase() + check.label.slice(1);
+      return check.verdict === 'met' ? `${label}: ${emoji}` : `${label}: ${emoji} **${check.detail}**`;
+    })
+    .join('\n');
+}
+
+/** One line per platform the avatar was rated on, skipping the ones VRChat says nothing about. */
+function ranksText(facts: Facts): string {
+  const lines = [
+    ['🖥️ PC', facts.pcRank] as const,
+    ['📱 Quest', facts.questRank] as const,
+  ]
+    .filter(([, rank]) => rank !== '')
+    .map(([label, rank]) => `- ${label}: ${RANK_EMOJI[rank] ?? '⚪'} ${rankText(rank)}`);
+  return lines.join('\n');
 }
 
 function rejoinText(facts: Facts): string {
@@ -77,7 +112,7 @@ export function reportValues(report: Report): TemplateValues {
     name: joiner.name,
     playerId: joiner.userId,
     event: kind,
-    eventText: kind === 'avatar' ? 'switched avatar' : facts.rejoin.seenHere === true ? 'is back' : 'joined',
+    eventText: kind === 'avatar' ? 'switched avatar' : facts.rejoin.seenHere === true ? 'rejoined' : 'joined',
     userId: joiner.userId,
     preset: preset.name,
     result: evaluation.verdict,
@@ -103,6 +138,15 @@ export function reportValues(report: Report): TemplateValues {
     avatar: facts.avatarName,
     avatarId: facts.avatarId,
     avatarImageUrl: facts.avatarImageUrl,
+    avatarUrl: vrchatUrl('avatar', facts.avatarId),
+    // A Discord link, so the field reads as the avatar's name and goes to VRChat's page.
+    avatarLink: facts.avatarName === ''
+      ? undefined
+      : (facts.avatarId === '' ? facts.avatarName : `["${facts.avatarName}"](${vrchatUrl('avatar', facts.avatarId)})`),
+    ranksText: ranksText(facts),
+    requirementsText: requirementsText(evaluation.checks),
+    logText: activityLog(facts.timeline),
+    profileUrl: vrchatUrl('user', joiner.userId),
     platform: facts.platform,
     platformEmoji: PLATFORM_EMOJI.find(([re]) => re.test(facts.platform))?.[1] ?? '❔',
     isFriend: facts.isFriend,
@@ -118,8 +162,13 @@ export function reportValues(report: Report): TemplateValues {
     rejoinAt: facts.rejoin.lastAt ?? '',
     world: instance.worldName,
     worldId: instance.worldId,
+    worldUrl: vrchatUrl('world', instance.worldId),
     instanceType: instance.instanceType,
+    instanceTypeText: instance.instanceType === '' ? '' : instanceTypeLabel(instance.instanceType),
     instanceId: instance.instanceId,
+    instanceName: instance.instanceId === ''
+      ? undefined
+      : `#${instance.instanceId}${instance.instanceType === '' ? '' : ` · ${instanceTypeLabel(instance.instanceType)}`}`,
     location: instance.location,
     time: at.toLocaleTimeString(),
     date: at.toLocaleDateString(),
