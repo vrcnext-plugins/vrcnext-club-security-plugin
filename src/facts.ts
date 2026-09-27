@@ -7,7 +7,7 @@
  * parallel and each one degrades to "unknown" on its own rather than holding up the report.
  */
 
-import type { PerformanceRank, VrcInstance, VrcTimelineEvent, VrchatApi } from '@vrcnext/plugin-api';
+import { trustScore, type PerformanceRank, type TrustScore, type VrcInstance, type VrcTimelineEvent, type VrchatApi } from '@vrcnext/plugin-api';
 
 import { rejoinIn, UNKNOWN_REJOIN, type Rejoin } from './history.js';
 
@@ -36,6 +36,11 @@ export interface Facts {
    * for the short activity log a report may show; `undefined` when VRCNext did not answer.
    */
   readonly timeline: readonly VrcTimelineEvent[] | undefined;
+  /**
+   * The profile score VRCNext used to show on every profile; `undefined` when the profile
+   * itself could not be read, since a score out of nothing would read as distrust.
+   */
+  readonly trust: TrustScore | undefined;
 }
 
 export const UNKNOWN_FACTS: Facts = {
@@ -51,6 +56,7 @@ export const UNKNOWN_FACTS: Facts = {
   groupIds: undefined,
   rejoin: UNKNOWN_REJOIN,
   timeline: undefined,
+  trust: undefined,
 };
 
 export interface CollectOptions {
@@ -122,5 +128,15 @@ export async function collectFacts(
     groupIds: groups,
     rejoin: location === '' ? UNKNOWN_REJOIN : rejoinIn(timeline, location, joinedAt),
     timeline,
+    // Badges and uploaded content are not in what VRCNext pushes, so those criteria are left
+    // out of the total rather than counted as failures.
+    trust: user === undefined ? undefined : trustScore({
+      tags: user.tags,
+      dateJoined: user.dateJoined,
+      ageVerified: user.ageVerified,
+      ageVerificationStatus: user.ageVerificationStatus,
+      bio: user.bio,
+      groupCount: user.groups.length,
+    }),
   };
 }

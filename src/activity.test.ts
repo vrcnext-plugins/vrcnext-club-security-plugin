@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { activityLog, discordTime } from './activity.js';
+import { activityLog, code, discordTime } from './activity.js';
 
 const LOTUS = 'wrld_aaaa1111-2222-3333-4444-555566667777:12345~group(grp_x)~groupAccessType(public)';
 
@@ -29,9 +29,9 @@ describe('activityLog', () => {
       event('friend_avatar', '2026-09-27T11:00:00Z'),
     ]);
     expect(log.split('\n')).toEqual([
-      '- <t:1790510400:R>: went to DragonZ Lotus (group-public)',
-      '- <t:1790506800:R>: changed avatar',
-      '- <t:1790503200:R>: came online',
+      '- went to `DragonZ Lotus` (group-public) <t:1790510400:R>',
+      '- changed avatar <t:1790506800:R>',
+      '- came online <t:1790503200:R>',
     ]);
   });
 
@@ -49,6 +49,17 @@ describe('activityLog', () => {
 
   it('still shows a type it has no wording for', () => {
     expect(activityLog([event('friend_something_new', '2026-09-27T10:00:00Z')]))
-      .toBe('- <t:1790503200:R>: something new');
+      .toBe('- something new <t:1790503200:R>');
+  });
+});
+
+describe('code', () => {
+  it('fences a name so its markdown is shown, not applied', () => {
+    expect(code('**Club**')).toBe('`**Club**`');
+  });
+
+  it('uses a longer fence for a name that contains one', () => {
+    expect(code('this is a `name')).toBe('`` this is a `name ``');
+    expect(code('a ``b`` c')).toBe('``` a ``b`` c ```');
   });
 });

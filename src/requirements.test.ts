@@ -21,6 +21,7 @@ function facts(overrides: Partial<Facts> = {}): Facts {
     groupIds: ['grp_a'],
     rejoin: { seenHere: false, lastAt: undefined },
     timeline: undefined,
+    trust: undefined,
     ...overrides,
   };
 }

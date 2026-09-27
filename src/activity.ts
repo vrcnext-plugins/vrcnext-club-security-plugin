@@ -12,6 +12,19 @@ import { parseLocation, type VrcTimelineEvent } from '@vrcnext/plugin-api';
 /** How many lines a log field carries by default. Discord caps a field at 1024 characters. */
 export const LOG_LINES = 5;
 
+/**
+ * A name as Discord code, so a world called `**x**` cannot style the line.
+ *
+ * Discord has no escape inside a code span, so a name containing a backtick is fenced with a
+ * longer run of them and padded, which is the only thing Discord itself honours.
+ */
+export function code(name: string): string {
+  if (!name.includes('`')) return `\`${name}\``;
+  const longest = Math.max(...[...name.matchAll(/`+/g)].map((m) => m[0].length));
+  const fence = '`'.repeat(longest + 1);
+  return `${fence} ${name} ${fence}`;
+}
+
 /** `<t:1790517600:R>` — Discord renders this relative to whoever is reading it. */
 export function discordTime(at: string | number): string {
   const ms = typeof at === 'number' ? at : Date.parse(at);
@@ -21,7 +34,7 @@ export function discordTime(at: string | number): string {
 
 /** What VRCNext's timeline types mean, in words a moderator reads rather than column names. */
 function phrase(event: VrcTimelineEvent): string {
-  const where = event.worldName === '' ? '' : ` ${event.worldName}`;
+  const where = event.worldName === '' ? '' : ` ${code(event.worldName)}`;
   const type = parseLocation(event.location).instanceType;
   const instance = type === '' ? where : `${where} (${type})`;
   switch (event.type) {
@@ -53,7 +66,10 @@ function phrase(event: VrcTimelineEvent): string {
 }
 
 /**
- * The newest events as `- <t:…:R>: went to Club X (group-public)`, newest first.
+ * The newest events as `- went to \`Club X\` (group-public) <t:…:R>`, newest first.
+ *
+ * The time goes last because every line starts with one otherwise, and what happened is what
+ * the reader is scanning for.
  *
  * Returns `''` when VRCNext had nothing, which drops the field from the embed rather than
  * showing an empty one.
@@ -68,7 +84,7 @@ export function activityLog(
     .slice(0, limit)
     .map((event) => {
       const when = discordTime(event.timestamp);
-      return when === '' ? `- ${phrase(event)}` : `- ${when}: ${phrase(event)}`;
+      return when === '' ? `- ${phrase(event)}` : `- ${phrase(event)} ${when}`;
     })
     .join('\n');
 }

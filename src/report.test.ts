@@ -23,6 +23,7 @@ function facts(overrides: Partial<Facts> = {}): Facts {
     groupIds: ['grp_a'],
     rejoin: { seenHere: false, lastAt: undefined },
     timeline: undefined,
+    trust: undefined,
     ...overrides,
   };
 }
@@ -101,7 +102,7 @@ test('the activity field is dropped when VRCNext has no history for the player',
   assert.ok(withLog !== undefined);
   const logged = withLog.fields ?? [];
   assert.equal(logged.length, 3);
-  assert.equal(logged[2]?.value, '- <t:1790503200:R>: changed avatar');
+  assert.equal(logged[2]?.value, '- changed avatar <t:1790503200:R>');
 
   // `renderEmbed` drops a field that rendered empty, so a stranger's report is two fields.
   const without = renderEmbed(completeEmbed(DEFAULT_EMBED), reportValues(report()), { at: new Date(0) });
@@ -125,4 +126,17 @@ test('group values only exist when the preset checks a group', () => {
 
 test('reportSummary fits one line', () => {
   assert.equal(reportSummary(report()), '✅ Tupper joined (Club) · All requirements met · PC Good · Quest Poor · new');
+});
+
+test('the trust score is a coloured percentage, and its field goes when there is no profile', () => {
+  const scored = reportValues(report({}, { trust: { percent: 100, criteria: [], description: 'Trusted.' } }));
+  assert.equal(scored['trustScoreText'], '🟢 **100**%');
+  assert.equal(scored['trustScore'], 100);
+
+  const low = reportValues(report({}, { trust: { percent: 80, criteria: [], description: 'High.' } }));
+  assert.equal(low['trustScoreText'], '🟡 **80**%');
+
+  assert.equal(reportValues(report())['trustScoreText'], undefined);
+  const embed = renderEmbed(completeEmbed(DEFAULT_EMBED), reportValues(report()));
+  assert.ok(!(embed?.fields ?? []).some((f) => f.name === 'Trust Score'));
 });

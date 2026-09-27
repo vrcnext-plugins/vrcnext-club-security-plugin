@@ -10,6 +10,7 @@ import {
   TemplateError,
   instanceTypeLabel,
   renderTemplate,
+  trustScoreEmoji,
   timeAgo,
   type TemplateValues,
   type VrcInstance,
@@ -138,6 +139,12 @@ export function reportValues(report: Report): TemplateValues {
     avatarLink: facts.avatarName === ''
       ? undefined
       : (facts.avatarId === '' ? facts.avatarName : `["${facts.avatarName}"](${vrchatUrl('avatar', facts.avatarId)})`),
+    trustScore: facts.trust?.percent,
+    trustScoreText: facts.trust === undefined
+      ? undefined
+      : `${trustScoreEmoji(facts.trust.percent)} **${String(facts.trust.percent)}**%`,
+    trustScoreEmoji: facts.trust === undefined ? undefined : trustScoreEmoji(facts.trust.percent),
+    trustText: facts.trust?.description,
     ranksText: ranksText(facts),
     requirementsText: requirementsText(evaluation.checks),
     logText: activityLog(facts.timeline),

@@ -43,6 +43,7 @@ export const DEFAULT_EMBED = {
   timestamp: true,
   fields: [
     { name: 'Requirements', value: '{requirementsText}', inline: true },
+    { name: 'Trust Score', value: '{trustScoreText}', inline: true },
     { name: 'Avatar', value: '{{ avatarLink if avatarLink else "Unknown" }}\n{ranksText}', inline: true },
     { name: 'Recently', value: '{logText}', inline: false },
   ],
@@ -54,6 +55,7 @@ export const TEMPLATE_VARIABLES = [
   'failedText', 'unverifiedText', 'ageVerified', 'ageVerifiedText', 'ageVerifiedEmoji', 'ageStatus',
   'pcRank', 'pcRankText', 'pcRankEmoji', 'questRank', 'questRankText', 'questRankEmoji',
   'avatar', 'avatarId', 'avatarImageUrl', 'avatarUrl', 'avatarLink', 'ranksText', 'requirementsText', 'logText',
+  'trustScore', 'trustScoreText', 'trustScoreEmoji', 'trustText',
   'profileUrl', 'platform', 'platformEmoji', 'isFriend', 'friendText',
   'inGroup', 'inGroupText', 'inGroupEmoji', 'rejoin', 'rejoinText', 'rejoinEmoji', 'rejoinAgo', 'rejoinSince',
   'world', 'worldId', 'worldUrl', 'instanceType', 'instanceTypeText', 'instanceId', 'instanceName',
