@@ -11,9 +11,9 @@
  */
 
 import {
+  discordWebhookPayload,
   postWebhook,
   renderEmbed,
-  webhookPayload,
   type PluginContext,
   type TemplateError,
 } from '@vrcnext/plugin-api';
@@ -115,7 +115,7 @@ async function sendDiscord(ctx: Ctx, report: Report): Promise<void> {
     http: ctx.http,
     logger: ctx.logger,
     url: discord.webhookUrl,
-    payload: webhookPayload(embed, { username: 'Club Security' }),
+    payload: discordWebhookPayload(embed, { username: 'Club Security' }),
     label: `Preset "${report.preset.name}"`,
   });
   if (!result.ok) ctx.logger.warn(String(result.error));
