@@ -3,7 +3,7 @@
   "algorithm": "ed25519",
   "id": "club-security",
   "publicKey": "7dbf58b8ca01d7cb7be917dad7ee822f13cb72e219f6604415b6f7ab95a743f7",
-  "digest": "92bdd2ca15ae04d67bb2bd2ad9194740b3cd02acf4688cc3cf7667509dda28ce",
-  "signature": "a27b7f80785fd02c1aea4a0fd74184442fd125aeaf18260ee83d7edb98d523df0132d797735fc470f9e4ae96f354212be2d5410292d80af4fe07ac6eee54cf0d",
-  "signedAt": 1790633315
+  "digest": "77254444ecfd24f9d6af3226124351174d8993d5676a60fbbd424fbbfedfbc37",
+  "signature": "9e294277b58f71e7d77cab335f169d288e6c00ee4b0f7718af20d9ddaf11097cbbcf44aba768ab4eb82017a0248d24b90b01de4959b836e9e1236dbfcbd2310e",
+  "signedAt": 1790633689
 }
