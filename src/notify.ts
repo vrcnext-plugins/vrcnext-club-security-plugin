@@ -5,11 +5,13 @@
  * - Desktop and VR: through the VRCNext Bridge's targets, addressed by name; VR overlays get the
  *   preset's VR template (WayVR draws with one font and shows nothing for emoji). On Windows,
  *   when the bridge delivers nothing, VRCNext's own tray toast and wrist overlay.
- * - Discord: the preset's embed, rendered with the report's values and posted to its webhook
- *   through `ctx.http.fetch`. Only `discord.com` is in the manifest's `hosts`.
+ * - Discord: the preset's embed, rendered with the report's values and handed to the API's
+ *   {@link postWebhook}, which validates the URL, dumps the payload at debug and explains a
+ *   refusal. Only `discord.com` is in the manifest's `hosts`.
  */
 
 import {
+  postWebhook,
   renderEmbed,
   webhookPayload,
   type PluginContext,
@@ -20,9 +22,6 @@ import { reportLines, reportSummary, reportValues, type Report } from './report.
 import { embedOf, templatesOf, type Settings } from './settings.js';
 
 type Ctx = PluginContext<Settings>;
-
-/** Matches the host declared in plugin.json; `ptb.`/`canary.` would need their own entries. */
-const DISCORD_WEBHOOK = /^https:\/\/discord\.com\/api\/webhooks\/\d+\/[\w-]+$/;
 
 function accentFor(report: Report): 'ok' | 'warn' | 'info' {
   if (report.evaluation.verdict === 'failed') return 'warn';
@@ -104,11 +103,6 @@ async function sendDesktopAndVr(ctx: Ctx, report: Report): Promise<void> {
 async function sendDiscord(ctx: Ctx, report: Report): Promise<void> {
   const { discord } = report.preset;
   if (!discord.enabled) return;
-  const url = discord.webhookUrl.trim();
-  if (!DISCORD_WEBHOOK.test(url)) {
-    ctx.logger.warn(`Preset "${report.preset.name}": Discord is on but the URL is not a discord.com webhook URL.`);
-    return;
-  }
   const embed = renderEmbed(embedOf(report.preset), reportValues(report), {
     at: new Date(report.at),
     onError: (error) => { ctx.logger.warn(`Preset "${report.preset.name}": embed template: ${error.message}`); },
@@ -117,51 +111,14 @@ async function sendDiscord(ctx: Ctx, report: Report): Promise<void> {
     ctx.logger.warn(`Preset "${report.preset.name}": the embed rendered empty; nothing posted.`);
     return;
   }
-  const payload = JSON.stringify(webhookPayload(embed, { username: 'Club Security' }));
-  // The payload as Discord will receive it, for when what arrives is not what was expected —
-  // a picture that does not appear, a field that is not there. Debug, so it is written only
-  // while Verbose debug logging is on; the webhook URL is a secret and never goes in.
-  ctx.logger.debug(`Preset "${report.preset.name}": posting ${String(payload.length)} bytes to Discord: ${payload}`);
-  const response = await ctx.http.fetch(url, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: payload,
-    credentials: 'omit',
-    referrerPolicy: 'no-referrer',
+  const result = await postWebhook({
+    http: ctx.http,
+    logger: ctx.logger,
+    url: discord.webhookUrl,
+    payload: webhookPayload(embed, { username: 'Club Security' }),
+    label: `Preset "${report.preset.name}"`,
   });
-  if (response.ok) {
-    ctx.logger.debug(`Preset "${report.preset.name}": Discord accepted the report (${String(response.status)}).`);
-    return;
-  }
-  ctx.logger.warn(`Preset "${report.preset.name}": ${webhookFailure(response.status)}`);
-}
-
-/**
- * What a refused webhook means, in terms of something to do about it.
- *
- * A bare status code is a number to go and look up. Discord's failures here have exactly a few
- * causes, and each one has a different fix — a deleted webhook and a rate limit look identical
- * otherwise, and only one of them is worth touching the settings over.
- */
-export function webhookFailure(status: number): string {
-  if (status === 401 || status === 403) {
-    return `Discord rejected the webhook token (${String(status)}). It was regenerated or the URL is `
-      + 'mis-copied; take a fresh one from Server Settings → Integrations → Webhooks.';
-  }
-  if (status === 404) {
-    return 'That webhook no longer exists (404). It was deleted in Discord, or the URL is wrong.';
-  }
-  if (status === 429) {
-    return 'Discord is rate-limiting this webhook (429); the report was dropped.';
-  }
-  if (status === 400) {
-    return 'Discord refused the embed (400). Something in the template renders to more than an '
-      + 'embed may carry, or to an invalid colour or URL.';
-  }
-  if (status >= 500) {
-    return `Discord could not take the report (${String(status)}); this is their side, not the preset.`;
-  }
-  return `Discord answered ${String(status)}.`;
+  if (!result.ok) ctx.logger.warn(String(result.error));
 }
 
 /** Sends on every channel the preset enables. Never throws: a failed channel is logged. */

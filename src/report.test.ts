@@ -160,14 +160,21 @@ test('the embed follows the plugin\'s own until a club switches to its own', () 
   assert.equal(off.discord.embed.title, 'mine');
 });
 
+/** `requirementsText` is one of the template's values, typed as anything a template may hold. */
+function text(values: Record<string, unknown>, key: string): string {
+  const value = values[key];
+  assert.equal(typeof value, 'string', `${key} should render as text`);
+  return value as string;
+}
+
 test('a requirement that measured something says the measurement, passed or not', () => {
   const scored = { percent: 97, criteria: [], description: 'Trusted.' };
   const met = reportValues(report({ minTrustScore: 75 }, { trust: scored }));
-  assert.match(String(met['requirementsText']), /Trust score 75%\+: ✅ \*\*97%\*\*/);
+  assert.match(text(met, 'requirementsText'), /Trust score 75%\+: ✅ \*\*97%\*\*/);
 
   const under = reportValues(report({ minTrustScore: 98 }, { trust: scored }));
-  assert.match(String(under['requirementsText']), /Trust score 98%\+: ⛔ \*\*97%, needs 98%\*\*/);
+  assert.match(text(under, 'requirementsText'), /Trust score 98%\+: ⛔ \*\*97%, needs 98%\*\*/);
 
   // A requirement with nothing to measure still says only whether it holds.
-  assert.match(String(met['requirementsText']), /18\+ verified: ✅(\n|$)/);
+  assert.match(text(met, 'requirementsText'), /18\+ verified: ✅(\n|$)/);
 });
