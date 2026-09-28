@@ -117,16 +117,23 @@ async function sendDiscord(ctx: Ctx, report: Report): Promise<void> {
     ctx.logger.warn(`Preset "${report.preset.name}": the embed rendered empty; nothing posted.`);
     return;
   }
+  const payload = JSON.stringify(webhookPayload(embed, { username: 'Club Security' }));
+  // The payload as Discord will receive it, for when what arrives is not what was expected —
+  // a picture that does not appear, a field that is not there. Debug, so it is written only
+  // while Verbose debug logging is on; the webhook URL is a secret and never goes in.
+  ctx.logger.debug(`Preset "${report.preset.name}": posting ${String(payload.length)} bytes to Discord: ${payload}`);
   const response = await ctx.http.fetch(url, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify(webhookPayload(embed, { username: 'Club Security' })),
+    body: payload,
     credentials: 'omit',
     referrerPolicy: 'no-referrer',
   });
-  if (!response.ok) {
-    ctx.logger.warn(`Preset "${report.preset.name}": ${webhookFailure(response.status)}`);
+  if (response.ok) {
+    ctx.logger.debug(`Preset "${report.preset.name}": Discord accepted the report (${String(response.status)}).`);
+    return;
   }
+  ctx.logger.warn(`Preset "${report.preset.name}": ${webhookFailure(response.status)}`);
 }
 
 /**
