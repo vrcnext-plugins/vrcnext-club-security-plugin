@@ -17,7 +17,7 @@ import {
 } from '@vrcnext/plugin-api';
 
 import { reportLines, reportSummary, reportValues, type Report } from './report.js';
-import type { Settings } from './settings.js';
+import { templatesOf, type Settings } from './settings.js';
 
 type Ctx = PluginContext<Settings>;
 
@@ -53,9 +53,10 @@ async function sendNative(ctx: Ctx, report: Report): Promise<boolean> {
     return false;
   }
   const names = targets.map((t) => t.name);
+  const templates = templatesOf(preset);
   const batches = [
-    { sinks: preset.desktop ? names.filter((n) => !isVrTarget(n)) : [], template: preset.template },
-    { sinks: preset.vr ? names.filter(isVrTarget) : [], template: preset.templateVr.trim() === '' ? preset.template : preset.templateVr },
+    { sinks: preset.desktop ? names.filter((n) => !isVrTarget(n)) : [], template: templates.text },
+    { sinks: preset.vr ? names.filter(isVrTarget) : [], template: templates.vr },
   ].filter((b) => b.sinks.length > 0);
   if (batches.length === 0) {
     ctx.logger.debug('The bridge has no target for the enabled channels.');
@@ -88,7 +89,7 @@ async function sendDesktopAndVr(ctx: Ctx, report: Report): Promise<void> {
 
   // Windows without the bridge's targets: VRCNext's own tray toast and wrist overlay in one call.
   if (ctx.notifications.desktopAvailable) {
-    const lines = reportLines(report, preset.template, (e) => { warnTemplate(ctx, report, e); });
+    const lines = reportLines(report, templatesOf(preset).text, (e) => { warnTemplate(ctx, report, e); });
     ctx.notifications.desktop({
       title: lines[0] ?? `${report.joiner.name} joined`,
       subtitle: lines.slice(1).join(' · '),

@@ -106,8 +106,6 @@ export function reportValues(report: Report): TemplateValues {
     event: kind,
     eventText: kind === 'avatar' ? 'switched avatar' : facts.rejoin.seenHere === true ? 'rejoined' : 'joined',
     userId: joiner.userId,
-    /** The name `userId` had before 2.5.0; still rendered so an older template keeps working. */
-    playerId: joiner.userId,
     preset: preset.name,
     result: evaluation.verdict,
     resultText: VERDICT_TEXT[evaluation.verdict],

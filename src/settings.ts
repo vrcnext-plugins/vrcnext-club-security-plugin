@@ -6,7 +6,7 @@
  * each with its own template or embed). The three numbers at the bottom are global.
  */
 
-import { INSTANCE_TYPES, PERFORMANCE_RANKS, instanceTypeLabel, type SettingsSchema, type SettingsValues } from '@vrcnext/plugin-api';
+import { INSTANCE_TYPES, PERFORMANCE_RANKS, instanceTypeLabel, type SettingVariables, type SettingsSchema, type SettingsValues } from '@vrcnext/plugin-api';
 
 /** The report as text: first line = title, rest = body. Used for toasts, desktop and VR. */
 export const DEFAULT_TEMPLATE = [
@@ -54,19 +54,92 @@ export const DEFAULT_EMBED = {
   ],
 } as const;
 
-/** Names a template may use. Listed under the editors so the user can see them. */
-export const TEMPLATE_VARIABLES = [
-  'name', 'userId', 'preset', 'event', 'eventText', 'result', 'resultText', 'resultEmoji', 'resultColor', 'checksText', 'checksPlainText',
-  'failedText', 'unverifiedText', 'ageVerified', 'ageVerifiedText', 'ageVerifiedEmoji', 'ageStatus',
-  'pcRank', 'pcRankText', 'pcRankEmoji', 'questRank', 'questRankText', 'questRankEmoji',
-  'avatar', 'avatarId', 'avatarImageUrl', 'avatarUrl', 'avatarLink', 'avatarPlain', 'ranksText', 'requirementsText', 'logText',
-  'userImageUrl',
-  'trustScore', 'trustScoreText', 'trustScoreEmoji', 'trustText',
-  'profileUrl', 'platform', 'platformEmoji', 'isFriend', 'friendText',
-  'inGroup', 'inGroupText', 'inGroupEmoji', 'rejoin', 'rejoinText', 'rejoinEmoji', 'rejoinAgo', 'rejoinSince', 'rejoinAt',
-  'world', 'worldId', 'worldUrl', 'instanceType', 'instanceTypeText', 'instanceId', 'instanceName',
-  'location', 'time', 'date', 'timestamp',
-] as const;
+/**
+ * Every placeholder a template may use, and what it holds.
+ *
+ * The host turns this into the chips under each text: hover for the description, click to copy
+ * `{name}`. It is also what a template is checked against while it is typed, so a name that is
+ * not here is marked before it renders as nothing in a live report.
+ */
+export const TEMPLATE_VARIABLES = {
+  name: 'Display name of the player who joined',
+  userId: 'Their VRChat user id, usr_…',
+  profileUrl: 'Link to their VRChat profile',
+  userImageUrl: 'Their profile picture',
+  preset: 'Name of the preset that produced this report',
+  event: 'join or avatar',
+  eventText: '"joined" or "switched avatar"',
+  result: 'met, unverified or failed',
+  resultText: 'The verdict in words',
+  resultEmoji: '✅, ⚠️ or ⛔',
+  resultColor: 'The verdict as an embed colour',
+  checksText: 'Every requirement checked, one per line',
+  checksPlainText: 'The same without emoji, for VR',
+  failedText: 'Only the requirements that failed',
+  unverifiedText: 'Only the requirements that could not be checked',
+  requirementsText: 'The requirements block as the embed shows it',
+  ageVerified: 'true when the account is 18+ verified',
+  ageVerifiedText: 'The age check in words',
+  ageVerifiedEmoji: 'The age check as an emoji',
+  ageStatus: 'VRChat\'s raw status: 18+, verified, hidden or empty',
+  trustScore: 'VRChat standing as a number out of 100',
+  trustScoreText: 'The standing as a coloured percentage',
+  trustScoreEmoji: 'The standing as a single circle',
+  trustText: 'What the standing is based on',
+  platform: 'standalonewindows, android or ios',
+  platformEmoji: 'The platform as an emoji',
+  isFriend: 'true when they are on your friend list',
+  friendText: 'Friendship in words',
+  avatar: 'Name of the avatar they are wearing',
+  avatarId: 'The avatar id, avtr_…',
+  avatarImageUrl: 'Thumbnail of the avatar',
+  avatarUrl: 'Link to the avatar page',
+  avatarLink: 'The avatar name as a link',
+  avatarPlain: 'The avatar name and both ranks, unlinked',
+  ranksText: 'PC and Quest performance ranks',
+  pcRank: 'PC performance rank',
+  pcRankText: 'PC rank in words',
+  pcRankEmoji: 'PC rank as a coloured circle',
+  questRank: 'Quest performance rank',
+  questRankText: 'Quest rank in words',
+  questRankEmoji: 'Quest rank as a coloured circle',
+  logText: 'What they have been doing recently, as bullet points',
+  inGroup: 'true when they are in the required group',
+  inGroupText: 'Group membership in words',
+  inGroupEmoji: 'Group membership as an emoji',
+  rejoin: 'true when this instance has seen them before',
+  rejoinText: 'Whether they have been here before, in words',
+  rejoinEmoji: 'The same as an emoji',
+  rejoinAgo: 'How long ago they were last here',
+  rejoinSince: 'The same as a Discord relative timestamp',
+  rejoinAt: 'When they were last here',
+  world: 'World name',
+  worldId: 'World id, wrld_…',
+  worldUrl: 'Link to the world page',
+  instanceType: 'public, friends+, group…',
+  instanceTypeText: 'The instance type as VRCNext writes it',
+  instanceId: 'The instance number',
+  instanceName: 'The instance as name and number',
+  location: 'The full location string',
+  time: 'Local time of the report',
+  date: 'Local date of the report',
+  timestamp: 'The report time as a Discord timestamp',
+} as const satisfies SettingVariables;
+
+/**
+ * The wording a preset actually uses.
+ *
+ * With the switch off a preset follows the plugin's own templates, so improving the default
+ * wording reaches every club that never wanted to write its own. With it on, the club's text
+ * wins — and an empty VR template still falls back to the report one, because a blank overlay
+ * is nobody's intent.
+ */
+export function templatesOf(preset: Preset): { readonly text: string; readonly vr: string } {
+  const custom = preset.templates;
+  const text = custom.enabled ? custom.template : DEFAULT_TEMPLATE;
+  const vr = custom.enabled && custom.templateVr.trim() !== '' ? custom.templateVr : text;
+  return { text, vr };
+}
 
 const RANK_OPTIONS = [
   { value: 'any', label: 'Any' },
@@ -148,19 +221,32 @@ export const preset = {
   toast: { kind: 'boolean', label: 'In-app toast', default: true },
   desktop: { kind: 'boolean', label: 'Desktop notification', default: true },
   vr: { kind: 'boolean', label: 'VR overlay notification', default: true },
-  template: {
-    kind: 'string',
-    multiline: true,
-    label: 'Report template',
-    description: 'First line = title, rest = body. A line whose placeholders are all empty is left out. Variables are listed under the Discord embed.',
-    default: DEFAULT_TEMPLATE,
-  },
-  templateVr: {
-    kind: 'string',
-    multiline: true,
-    label: 'VR overlay template',
-    description: 'Plain text: WayVR shows nothing for emoji. Empty means the report template.',
-    default: DEFAULT_TEMPLATE_VR,
+  templates: {
+    kind: 'object',
+    label: 'Templates',
+    toggle: {
+      label: 'Use custom templates',
+      description: 'Off means the plugin\'s own wording, which changes as the plugin improves.',
+      default: false,
+    },
+    fields: {
+      template: {
+        kind: 'string',
+        multiline: true,
+        label: 'Report template',
+        description: 'First line = title, rest = body. A line whose placeholders are all empty is left out.',
+        default: DEFAULT_TEMPLATE,
+        variables: TEMPLATE_VARIABLES,
+      },
+      templateVr: {
+        kind: 'string',
+        multiline: true,
+        label: 'VR overlay template',
+        description: 'Plain text: WayVR shows nothing for emoji. Empty means the report template.',
+        default: DEFAULT_TEMPLATE_VR,
+        variables: TEMPLATE_VARIABLES,
+      },
+    },
   },
   discord: {
     kind: 'object',

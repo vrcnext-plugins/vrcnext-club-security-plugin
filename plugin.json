@@ -1,8 +1,8 @@
 {
   "id": "club-security",
   "name": "Club Security",
-  "version": "2.6.4",
-  "apiVersion": "^0.3.15",
+  "version": "2.7.0",
+  "apiVersion": "^0.5.0",
   "description": "Per-club presets: filter instances, require 18+, avatar ranks, group membership or friendship, and report each join with a green, orange or red verdict to toast, desktop, VR or Discord.",
   "author": "vrcnext-plugins",
   "homepage": "https://github.com/vrcnext-plugins/vrcnext-club-security-plugin",
