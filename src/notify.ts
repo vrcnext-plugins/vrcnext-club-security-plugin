@@ -17,7 +17,7 @@ import {
 } from '@vrcnext/plugin-api';
 
 import { reportLines, reportSummary, reportValues, type Report } from './report.js';
-import { templatesOf, type Settings } from './settings.js';
+import { embedOf, templatesOf, type Settings } from './settings.js';
 
 type Ctx = PluginContext<Settings>;
 
@@ -109,7 +109,7 @@ async function sendDiscord(ctx: Ctx, report: Report): Promise<void> {
     ctx.logger.warn(`Preset "${report.preset.name}": Discord is on but the URL is not a discord.com webhook URL.`);
     return;
   }
-  const embed = renderEmbed(discord.embed, reportValues(report), {
+  const embed = renderEmbed(embedOf(report.preset), reportValues(report), {
     at: new Date(report.at),
     onError: (error) => { ctx.logger.warn(`Preset "${report.preset.name}": embed template: ${error.message}`); },
   });

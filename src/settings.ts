@@ -6,7 +6,7 @@
  * each with its own template or embed). The three numbers at the bottom are global.
  */
 
-import { INSTANCE_TYPES, PERFORMANCE_RANKS, instanceTypeLabel, type SettingVariables, type SettingsSchema, type SettingsValues } from '@vrcnext/plugin-api';
+import { INSTANCE_TYPES, PERFORMANCE_RANKS, completeEmbed, instanceTypeLabel, type EmbedTemplate, type SettingVariables, type SettingsSchema, type SettingsValues } from '@vrcnext/plugin-api';
 
 /** The report as text: first line = title, rest = body. Used for toasts, desktop and VR. */
 export const DEFAULT_TEMPLATE = [
@@ -141,6 +141,17 @@ export function templatesOf(preset: Preset): { readonly text: string; readonly v
   return { text, vr };
 }
 
+/**
+ * The embed a preset actually posts.
+ *
+ * Same bargain as {@link templatesOf}: with the switch off the preset follows the plugin's own
+ * embed, so every club gains each improvement to it without editing anything, and with it on the
+ * club's own embed wins. Turning it off does not discard what they wrote.
+ */
+export function embedOf(preset: Preset): EmbedTemplate {
+  return preset.discord.useCustomEmbed ? preset.discord.embed : completeEmbed(DEFAULT_EMBED);
+}
+
 const RANK_OPTIONS = [
   { value: 'any', label: 'Any' },
   ...[...PERFORMANCE_RANKS].reverse().map((rank) => ({ value: rank, label: `${rank} or better` })),
@@ -251,8 +262,14 @@ export const preset = {
   discord: {
     kind: 'object',
     label: 'Discord',
+    // The switch takes over the `enabled` field this object already had, so a preset stored
+    // before this change keeps its answer and the URL and embed simply fold away with it.
+    toggle: {
+      label: 'Post to a webhook',
+      description: 'Off means this preset reports to its other channels only.',
+      default: false,
+    },
     fields: {
-      enabled: { kind: 'boolean', label: 'Post to a webhook', default: false },
       webhookUrl: {
         kind: 'string',
         label: 'Webhook URL',
@@ -261,11 +278,20 @@ export const preset = {
         placeholder: 'https://discord.com/api/webhooks/…',
         format: 'url',
       },
+      useCustomEmbed: {
+        kind: 'boolean',
+        label: 'Use a custom embed',
+        description: 'Off means the plugin\'s own embed, which improves as the plugin does. Your edits are kept either way.',
+        default: false,
+      },
       embed: {
         kind: 'embed',
         label: 'Embed',
         default: DEFAULT_EMBED,
         variables: TEMPLATE_VARIABLES,
+        // Hidden rather than absent: the embed a club wrote is still theirs while the switch is
+        // off, and comes back as they left it when it goes on again.
+        hidden: (values) => values['useCustomEmbed'] !== true,
       },
     },
   },

@@ -6,7 +6,7 @@ import { defaultsFor, renderEmbed } from '@vrcnext/plugin-api';
 import type { Facts } from './facts.js';
 import { reportLines, reportSummary, reportValues, type Report } from './report.js';
 import { evaluate } from './requirements.js';
-import { DEFAULT_EMBED, preset as presetSchema, type Preset } from './settings.js';
+import { DEFAULT_EMBED, embedOf, preset as presetSchema, type Preset } from './settings.js';
 import { completeEmbed } from '@vrcnext/plugin-api';
 
 function facts(overrides: Partial<Facts> = {}): Facts {
@@ -146,4 +146,16 @@ test('the trust score is a coloured percentage, and its field goes when there is
   assert.equal(reportValues(report())['trustScoreText'], undefined);
   const embed = renderEmbed(completeEmbed(DEFAULT_EMBED), reportValues(report()));
   assert.ok(!(embed?.fields ?? []).some((f) => f.name === 'Trust Score'));
+});
+
+test('the embed follows the plugin\'s own until a club switches to its own', () => {
+  const defaults = defaultsFor(presetSchema);
+  const mine = { ...completeEmbed(DEFAULT_EMBED), title: 'mine' };
+  const off: Preset = { ...defaults, discord: { ...defaults.discord, useCustomEmbed: false, embed: mine } };
+  assert.equal(embedOf(off).title, DEFAULT_EMBED.title, 'off means the plugin\'s wording');
+
+  const on: Preset = { ...off, discord: { ...off.discord, useCustomEmbed: true } };
+  assert.equal(embedOf(on).title, 'mine');
+  // The point of hiding rather than clearing: turning it off leaves the club's embed intact.
+  assert.equal(off.discord.embed.title, 'mine');
 });
