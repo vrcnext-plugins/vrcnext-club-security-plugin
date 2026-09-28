@@ -159,3 +159,15 @@ test('the embed follows the plugin\'s own until a club switches to its own', () 
   // The point of hiding rather than clearing: turning it off leaves the club's embed intact.
   assert.equal(off.discord.embed.title, 'mine');
 });
+
+test('a requirement that measured something says the measurement, passed or not', () => {
+  const scored = { percent: 97, criteria: [], description: 'Trusted.' };
+  const met = reportValues(report({ minTrustScore: 75 }, { trust: scored }));
+  assert.match(String(met['requirementsText']), /Trust score 75%\+: ✅ \*\*97%\*\*/);
+
+  const under = reportValues(report({ minTrustScore: 98 }, { trust: scored }));
+  assert.match(String(under['requirementsText']), /Trust score 98%\+: ⛔ \*\*97%, needs 98%\*\*/);
+
+  // A requirement with nothing to measure still says only whether it holds.
+  assert.match(String(met['requirementsText']), /18\+ verified: ✅(\n|$)/);
+});

@@ -24,6 +24,14 @@ export interface Check {
   readonly verdict: Verdict;
   /** Why, in a few words. */
   readonly detail: string;
+  /**
+   * The measurement itself, when it is worth reading even though the check passed.
+   *
+   * A tick answers "does it hold?", which is all most requirements have to say. A score answers
+   * "by how much?", and 97% against a floor of 75% is worth seeing — so a check may carry the
+   * number and the report prints it beside the tick.
+   */
+  readonly valueText?: string;
 }
 
 export interface Evaluation {
@@ -89,9 +97,10 @@ function trustCheck(facts: Facts, minimum: number): Check {
   }
   const percent = facts.trust.percent;
   const short = `${trustScoreEmoji(percent)} Trust ${String(percent)}%`;
+  const valueText = `${String(percent)}%`;
   return percent >= minimum
-    ? { key: 'trust', label, short, verdict: 'met', detail: `${String(percent)}%` }
-    : { key: 'trust', label, short, verdict: 'failed', detail: `${String(percent)}%, needs ${String(minimum)}%` };
+    ? { key: 'trust', label, short, verdict: 'met', detail: valueText, valueText }
+    : { key: 'trust', label, short, verdict: 'failed', detail: `${valueText}, needs ${String(minimum)}%`, valueText };
 }
 
 function friendCheck(facts: Facts): Check {

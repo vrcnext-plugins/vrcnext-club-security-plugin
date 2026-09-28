@@ -56,17 +56,20 @@ function vrchatUrl(kind: 'user' | 'avatar' | 'world' | 'group', id: string): str
 }
 
 /**
- * The checks as Discord lines: `18+ verified: ✅`, `PC avatar rank: ⛔ **Very Poor**`.
+ * The checks as Discord lines: `18+ verified: ✅`, `PC avatar rank: ⛔ **Very Poor**`,
+ * `Trust score 75%+: ✅ **97%**`.
  *
- * A check that passed needs no words — the tick says it. One that did not is the reason the
- * report was worth reading, so its detail is bold.
+ * A check that passed usually needs no words — the tick says it. One that did not is the reason
+ * the report was worth reading, so its detail is bold. A check that measured something says the
+ * measurement either way: passing at 97% and passing at 76% are not the same news.
  */
 function requirementsText(checks: Evaluation['checks']): string {
   return checks
     .map((check) => {
       const emoji = VERDICT_EMOJI[check.verdict];
       const label = check.label.charAt(0).toUpperCase() + check.label.slice(1);
-      return check.verdict === 'met' ? `${label}: ${emoji}` : `${label}: ${emoji} **${check.detail}**`;
+      const said = check.verdict === 'met' ? check.valueText : check.detail;
+      return said === undefined ? `${label}: ${emoji}` : `${label}: ${emoji} **${said}**`;
     })
     .join('\n');
 }
