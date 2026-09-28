@@ -19,7 +19,7 @@ const VERDICT_TONE: Readonly<Record<Verdict, UiBadgeTone>> = { met: 'ok', unveri
 export interface PanelDeps {
   readonly currentInstance: () => VrcInstance | undefined;
   readonly sendTest: () => Promise<void>;
-  /** You, through every enabled preset, with the self and whitelist skips bypassed. */
+  /** You, through every enabled preset, with the skips that keep you out of reports bypassed. */
   readonly testSelf: () => Promise<void>;
   /** Everyone in your instance right now, checked without sending anything. */
   readonly checkEveryoneHere: () => Promise<void>;
@@ -93,7 +93,7 @@ export class ReportPanel {
         // groups that mean something.
         k.grid([
           k.button({
-            label: 'Test self',
+            label: 'Test me',
             icon: 'person_check',
             title: 'Runs your own account through every enabled preset, ignoring the rules that normally keep you out of reports, and sends the reports to their channels — so a silent webhook or a missing desktop notification shows up here. Uses your current instance, or the last one VRCNext recorded you in, or a stand-in when it has neither.',
             onClick: () => { void this.#deps.testSelf(); },

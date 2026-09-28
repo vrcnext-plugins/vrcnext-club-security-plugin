@@ -154,13 +154,13 @@ class ClubSecurity {
    * switched. The first sighting only records, because there is nothing to compare it with.
    */
   #noteAvatars(instance: VrcInstance): void {
-    const self = this.#ctx.vrchat.self();
+    const me = this.#ctx.vrchat.self();
     for (const user of instance.users) {
       if (user.avatarId === '' || user.id === '') continue;
       const before = this.#avatars.get(user.id);
       this.#avatars.set(user.id, user.avatarId);
       if (before === undefined || before === user.avatarId) continue;
-      if (user.id === self?.id) continue;
+      if (user.id === me?.id) continue;
       void this.#onAvatarChange({ name: user.displayName, userId: user.id }, instance);
     }
     // Someone who left should not keep a slot; their next join records afresh.
@@ -196,9 +196,9 @@ class ClubSecurity {
   }
 
   #isSelf(joiner: Joiner): boolean {
-    const self = this.#ctx.vrchat.self();
-    if (self === undefined) return false;
-    return joiner.userId !== '' ? joiner.userId === self.id : joiner.name === self.displayName;
+    const me = this.#ctx.vrchat.self();
+    if (me === undefined) return false;
+    return joiner.userId !== '' ? joiner.userId === me.id : joiner.name === me.displayName;
   }
 
   async #onJoin(joiner: Joiner): Promise<void> {
@@ -329,8 +329,8 @@ class ClubSecurity {
       this.#ctx.notifications.toast({ message: 'Not in an instance VRCNext can see anyone in.', ok: false });
       return;
     }
-    const self = this.#ctx.vrchat.self();
-    const here = instance.users.filter((user) => user.id !== '' && user.id !== self?.id).slice(0, MAX_ROOM_CHECK);
+    const me = this.#ctx.vrchat.self();
+    const here = instance.users.filter((user) => user.id !== '' && user.id !== me?.id).slice(0, MAX_ROOM_CHECK);
     if (here.length === 0) {
       this.#ctx.notifications.toast({ message: 'Nobody else is here.', ok: false });
       return;

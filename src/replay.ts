@@ -74,14 +74,14 @@ export const EXAMPLE_INSTANCE = instanceFrom(
  */
 export async function selfCheck(options: ReplayOptions): Promise<Replay | undefined> {
   const { vrchat, signal } = options;
-  const self = vrchat.self();
-  if (self === undefined) return undefined;
-  const joiner: Joiner = { name: self.displayName, userId: self.id };
+  const me = vrchat.self();
+  if (me === undefined) return undefined;
+  const joiner: Joiner = { name: me.displayName, userId: me.id };
 
   const current = options.currentInstance;
   if (current !== undefined) return { joiner, instance: current, located: true };
 
-  const timeline = await vrchat.userTimeline(self.id, { signal }).catch(() => []);
+  const timeline = await vrchat.userTimeline(me.id, { signal }).catch(() => []);
   const where = lastLocation(timeline);
   if (where === undefined) return { joiner, instance: EXAMPLE_INSTANCE, located: false };
   const world = await vrchat.world(parseLocation(where.location).worldId, { signal }).catch(() => undefined);
@@ -94,9 +94,9 @@ export async function selfCheck(options: ReplayOptions): Promise<Replay | undefi
  */
 export async function lastJoin(options: ReplayOptions): Promise<Replay | undefined> {
   const { vrchat, signal } = options;
-  const self = vrchat.self();
+  const me = vrchat.self();
   const recent = await vrchat.recentPlayers({ signal });
-  const player = recent.find((user) => user.id !== '' && user.id !== self?.id);
+  const player = recent.find((user) => user.id !== '' && user.id !== me?.id);
   if (player === undefined) return undefined;
   const joiner: Joiner = { name: player.displayName, userId: player.id };
 
