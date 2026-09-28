@@ -124,7 +124,37 @@ async function sendDiscord(ctx: Ctx, report: Report): Promise<void> {
     credentials: 'omit',
     referrerPolicy: 'no-referrer',
   });
-  if (!response.ok) ctx.logger.warn(`Discord webhook answered ${String(response.status)}.`);
+  if (!response.ok) {
+    ctx.logger.warn(`Preset "${report.preset.name}": ${webhookFailure(response.status)}`);
+  }
+}
+
+/**
+ * What a refused webhook means, in terms of something to do about it.
+ *
+ * A bare status code is a number to go and look up. Discord's failures here have exactly a few
+ * causes, and each one has a different fix — a deleted webhook and a rate limit look identical
+ * otherwise, and only one of them is worth touching the settings over.
+ */
+export function webhookFailure(status: number): string {
+  if (status === 401 || status === 403) {
+    return `Discord rejected the webhook token (${String(status)}). It was regenerated or the URL is `
+      + 'mis-copied; take a fresh one from Server Settings → Integrations → Webhooks.';
+  }
+  if (status === 404) {
+    return 'That webhook no longer exists (404). It was deleted in Discord, or the URL is wrong.';
+  }
+  if (status === 429) {
+    return 'Discord is rate-limiting this webhook (429); the report was dropped.';
+  }
+  if (status === 400) {
+    return 'Discord refused the embed (400). Something in the template renders to more than an '
+      + 'embed may carry, or to an invalid colour or URL.';
+  }
+  if (status >= 500) {
+    return `Discord could not take the report (${String(status)}); this is their side, not the preset.`;
+  }
+  return `Discord answered ${String(status)}.`;
 }
 
 /** Sends on every channel the preset enables. Never throws: a failed channel is logged. */
