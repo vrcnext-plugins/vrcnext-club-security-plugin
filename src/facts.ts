@@ -7,7 +7,7 @@
  * parallel and each one degrades to "unknown" on its own rather than holding up the report.
  */
 
-import { parseLocation, recentUserEvents, trustScore, type PerformanceRank, type TrustScore, type VrcInstance, type VrcTimelineEvent, type VrchatApi } from '@vrcnext/plugin-api';
+import { parseLocation, publicImageUrl, recentUserEvents, trustScore, type PerformanceRank, type TrustScore, type VrcInstance, type VrcTimelineEvent, type VrchatApi } from '@vrcnext/plugin-api';
 
 import { rejoinIn, UNKNOWN_REJOIN, type Rejoin } from './history.js';
 
@@ -89,7 +89,7 @@ async function avatarFacts(vrchat: VrchatApi, joiner: Joiner, instance: VrcInsta
   return {
     avatarId,
     avatarName: avatar?.name ?? avatarName,
-    avatarImageUrl: avatar?.thumbnailImageUrl ?? '',
+    avatarImageUrl: publicImageUrl(avatar?.thumbnailImageUrl) || publicImageUrl(avatar?.imageUrl),
     pcRank: avatar?.pcRank ?? '',
     questRank: avatar?.questRank ?? '',
   };
@@ -157,7 +157,10 @@ export async function collectFacts(
     ageVerificationStatus: user?.ageVerificationStatus ?? inInstance?.ageVerificationStatus ?? '',
     isFriend: user?.isFriend,
     platform: user?.platform ?? inInstance?.platform ?? '',
-    userImageUrl: user?.imageUrl ?? inInstance?.imageUrl ?? '',
+    // VRCNext's own `imageUrl` is its image cache on this machine, which nothing outside the app
+    // can load; VRChat serves `currentAvatarImageUrl` itself, so that is the profile picture a
+    // report can actually show. Either way the value is checked rather than trusted.
+    userImageUrl: publicImageUrl(user?.currentAvatarImageUrl) || publicImageUrl(user?.imageUrl) || publicImageUrl(inInstance?.imageUrl),
     ...(avatar ?? { avatarId: '', avatarName: '', avatarImageUrl: '', pcRank: '', questRank: '' }),
     groupIds: groups,
     rejoin: location === '' ? UNKNOWN_REJOIN : rejoinIn(timeline, location),

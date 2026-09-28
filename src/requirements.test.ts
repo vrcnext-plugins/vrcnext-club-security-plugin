@@ -82,3 +82,33 @@ test('every check names itself in the few words a pill can hold', () => {
   const unknown = evaluate(strict, facts({ pcRank: '', questRank: '' })).checks;
   assert.deepEqual(unknown.map((c) => c.short), ['18+', 'PC unknown', 'Quest unknown']);
 });
+
+const TRUSTED = { percent: 97, criteria: [], description: 'Trusted.' };
+
+test('a trust score of zero asks for nothing, so the report never mentions one', () => {
+  const result = evaluate(preset({ minTrustScore: 0 }), facts({ trust: TRUSTED }));
+  assert.equal(result.checks.some((c) => c.key === 'trust'), false);
+});
+
+test('a trust requirement is a check like any other, and counts in the verdict', () => {
+  const met = evaluate(preset({ minTrustScore: 90 }), facts({ trust: TRUSTED })).checks.find((c) => c.key === 'trust');
+  assert.ok(met, 'the check must be there once a preset asks for one');
+  assert.equal(met.verdict, 'met');
+  assert.equal(met.detail, '97%');
+  assert.match(met.short, /Trust 97%/);
+
+  const failed = evaluate(preset({ minTrustScore: 98 }), facts({ trust: TRUSTED }));
+  assert.equal(failed.verdict, 'failed', 'a score under the bar fails the report');
+  assert.equal(failed.checks.find((c) => c.key === 'trust')?.detail, '97%, needs 98%');
+});
+
+test('a profile that could not be read is unverified, never the joiner\'s fault', () => {
+  const result = evaluate(preset({ minTrustScore: 50 }), facts({ trust: undefined }));
+  assert.equal(result.checks.find((c) => c.key === 'trust')?.verdict, 'unverified');
+  assert.equal(result.verdict, 'unverified');
+});
+
+test('an avatar switch is judged on the avatar alone, trust included', () => {
+  const result = evaluate(preset({ minTrustScore: 99 }), facts({ trust: TRUSTED }), { only: AVATAR_CHECKS });
+  assert.equal(result.checks.some((c) => c.key === 'trust'), false);
+});

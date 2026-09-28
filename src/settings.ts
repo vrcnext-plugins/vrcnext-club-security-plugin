@@ -48,7 +48,6 @@ export const DEFAULT_EMBED = {
   timestamp: true,
   fields: [
     { name: 'Requirements', value: '{requirementsText}', inline: true },
-    { name: 'Trust Score', value: '{trustScoreText}', inline: true },
     { name: 'Avatar', value: '{avatarLink}\n{ranksText}', inline: true },
     { name: 'Recently', value: '{logText}', inline: false },
   ],
@@ -212,6 +211,21 @@ export const preset = {
     default: '',
   },
   requireFriend: { kind: 'boolean', label: 'Must be on my friend list', default: false },
+  minTrustScore: {
+    kind: 'number',
+    label: 'Trust score at least',
+    description:
+      'The profile score VRChat stopped showing: account age, 18+ status, a bio, groups joined. '
+      + '0 asks for nothing, and the score is left out of the report entirely.',
+    default: 0,
+    min: 0,
+    max: 100,
+    step: 1,
+    integer: true,
+    unit: '%',
+    slider: true,
+    markers: [0, 25, 50, 75, 100],
+  },
   whitelist: {
     kind: 'user',
     label: 'Never check these people',

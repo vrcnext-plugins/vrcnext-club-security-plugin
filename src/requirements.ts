@@ -9,7 +9,7 @@
  * - `failed` (red, ⛔): it was checked and does not hold.
  */
 
-import { rankIndex, rankLabel } from '@vrcnext/plugin-api';
+import { rankIndex, rankLabel, trustScoreEmoji } from '@vrcnext/plugin-api';
 
 import type { Facts } from './facts.js';
 import type { Preset } from './settings.js';
@@ -17,7 +17,7 @@ import type { Preset } from './settings.js';
 export type Verdict = 'met' | 'unverified' | 'failed';
 
 export interface Check {
-  readonly key: 'age' | 'pcRank' | 'questRank' | 'group' | 'friend';
+  readonly key: 'age' | 'pcRank' | 'questRank' | 'group' | 'friend' | 'trust';
   readonly label: string;
   /** Two or three words for a pill, where the colour already says whether it holds. */
   readonly short: string;
@@ -74,6 +74,26 @@ function groupCheck(facts: Facts, groupId: string): Check {
     : { key: 'group', label, short: 'Group member', verdict: 'unverified', detail: 'not among visible memberships' };
 }
 
+/**
+ * The profile score, as a requirement rather than a number on the side.
+ *
+ * A standing is only worth printing when someone asked for one, and once a preset does ask, the
+ * percentage belongs with the other checks: read in one place, coloured by whether it passes,
+ * counted in the verdict. A profile that could not be read is unverified, never a failure —
+ * VRCNext not answering is not the joiner's doing.
+ */
+function trustCheck(facts: Facts, minimum: number): Check {
+  const label = `Trust score ${String(minimum)}%+`;
+  if (facts.trust === undefined) {
+    return { key: 'trust', label, short: 'Trust unknown', verdict: 'unverified', detail: 'profile unreadable' };
+  }
+  const percent = facts.trust.percent;
+  const short = `${trustScoreEmoji(percent)} Trust ${String(percent)}%`;
+  return percent >= minimum
+    ? { key: 'trust', label, short, verdict: 'met', detail: `${String(percent)}%` }
+    : { key: 'trust', label, short, verdict: 'failed', detail: `${String(percent)}%, needs ${String(minimum)}%` };
+}
+
 function friendCheck(facts: Facts): Check {
   const label = 'On friend list';
   const short = 'Friend';
@@ -106,5 +126,7 @@ export function evaluate(preset: Preset, facts: Facts, options: EvaluateOptions 
   if (preset.minQuestRank !== 'any' && wanted('questRank')) checks.push(rankCheck('questRank', 'Quest avatar rank', facts.questRank, preset.minQuestRank));
   if (preset.requiredGroup !== '' && wanted('group')) checks.push(groupCheck(facts, preset.requiredGroup));
   if (preset.requireFriend && wanted('friend')) checks.push(friendCheck(facts));
+  // Zero is "any": every profile clears it, so asking for it would only print a line nobody set.
+  if (preset.minTrustScore > 0 && wanted('trust')) checks.push(trustCheck(facts, preset.minTrustScore));
   return { verdict: worst(checks.map((c) => c.verdict)), checks };
 }

@@ -23,7 +23,7 @@ The verdict reaches your templates as `{result}`, `{resultText}`, `{resultEmoji}
 | :--- | :--- | :--- |
 | Identity | Preset name, Enabled | The name appears in every report as `{preset}`. |
 | Filters | Instance types, Group, Worlds | One of each kind. Empty means "any". A pickable group and worlds, not pasted ids. |
-| Requirements | Require 18+, PC / Quest avatar rank at least, Must be a member of, Must be on my friend list | Each one becomes a check with its own verdict. |
+| Requirements | Require 18+, PC / Quest avatar rank at least, Must be a member of, Must be on my friend list, Trust score at least | Each one becomes a check with its own verdict. |
 | Exceptions | Never check these people | Picked from your friends, favourites or the instance. Staff join and change avatar without a report. |
 | Avatars | Warn when someone here switches avatar | Re-checks the avatar limits alone against the new avatar. |
 | Channels | In-app toast, Desktop, VR overlay, Discord | Per preset, so a strict club can post to Discord while a relaxed one only toasts. |
@@ -92,7 +92,7 @@ the field red rather than rendering as nothing an hour later.
 | :--- | :--- |
 | Verdict | `result` `resultText` `resultEmoji` `resultColor` `checksText` `checksPlainText` `failedText` `unverifiedText` |
 | Player | `name` `userId` `profileUrl` `userImageUrl` `platform` `platformEmoji` `isFriend` `friendText` `ageVerified` `ageVerifiedText` `ageVerifiedEmoji` `ageStatus` |
-| Trust | `trustScore` `trustScoreText` `trustScoreEmoji` `trustText` — VRChat standing as a percentage, empty when the profile could not be read |
+| Trust | `trustScore` `trustScoreText` `trustScoreEmoji` `trustText` — the standing as a percentage, empty when the profile could not be read. Whether it is *required* is the preset's **Trust score at least**; these render it wherever you want it |
 | Avatar | `avatar` `avatarId` `avatarImageUrl` `avatarLink` `avatarPlain` `ranksText` `pcRank` `pcRankText` `pcRankEmoji` `questRank` `questRankText` `questRankEmoji` |
 | Activity | `logText` — the player's recent records as Discord lines |
 | Club | `preset` `inGroup` `inGroupText` `inGroupEmoji` |
@@ -116,6 +116,7 @@ Everything goes through `ctx.vrchat`, which reads VRCNext's data **without openi
 | Avatar and ranks | The avatar the player wears, resolved through VRCNext's avatar databases, then its performance ranks. | Only works when one of the databases knows the avatar; an unknown rank is unverified, never a failure. |
 | Group membership | The groups the user shows publicly. | A member who hides the membership is unverified, not a failure. |
 | Friendship | Your friend list. | — |
+| Trust score | The profile score VRChat stopped showing, rebuilt from account age, 18+ status, a bio and groups joined. Asked for with the **Trust score at least** slider; at 0 nothing is checked and the score is left out of the report. | Badges and uploaded content are not in what VRCNext pushes, so they are left out of the total rather than counted as failures. A profile that could not be read is unverified, never a failure. |
 | Recent activity | VRCNext's timeline, worded by the plugin system: `Blocked by you`, ``Visited `Jellybean` #52792 (Friends+)``, `Friend request from **X**`. Identical records collapse into one line with a `×2`, and a group instance names its group when VRCNext knows it. | Ten records deep per player, so a busy account's log is short. |
 | Rejoin | VRCNext's timeline: the player's ten most recent events, each with its location. Yes when one of them is this exact instance (same world **and** instance id) from before this join. | Survives restarts and reaches back to when VRCNext was installed, but only ten events deep per player. |
 
