@@ -52,6 +52,43 @@ export interface ReplayOptions {
 }
 
 /**
+ * A stand-in instance for a test with nothing to stand on: a public instance of a world that
+ * does not exist. Obvious in a report rather than plausible, because a report that looked real
+ * but was not would be the worst of the three outcomes.
+ */
+export const EXAMPLE_INSTANCE = instanceFrom(
+  'wrld_00000000-0000-0000-0000-000000000000:00000~public',
+  'Example World',
+);
+
+/**
+ * You, and where you last were — for "how would this preset treat me?".
+ *
+ * Every filter the real path applies to you is deliberately skipped by the caller: the point is
+ * to see the verdict you would get, and the code that normally makes sure you never report
+ * yourself would otherwise make that impossible to find out. Where you are comes from the
+ * instance when VRChat is running, from your own newest located record when it is not, and from
+ * {@link EXAMPLE_INSTANCE} when VRCNext has neither.
+ *
+ * `undefined` only before VRChat login, when there is no account to check.
+ */
+export async function selfCheck(options: ReplayOptions): Promise<Replay | undefined> {
+  const { vrchat, signal } = options;
+  const self = vrchat.self();
+  if (self === undefined) return undefined;
+  const joiner: Joiner = { name: self.displayName, userId: self.id };
+
+  const current = options.currentInstance;
+  if (current !== undefined) return { joiner, instance: current, located: true };
+
+  const timeline = await vrchat.userTimeline(self.id, { signal }).catch(() => []);
+  const where = lastLocation(timeline);
+  if (where === undefined) return { joiner, instance: EXAMPLE_INSTANCE, located: false };
+  const world = await vrchat.world(parseLocation(where.location).worldId, { signal }).catch(() => undefined);
+  return { joiner, instance: instanceFrom(where.location, world?.name ?? where.worldName), located: true };
+}
+
+/**
  * The last player VRCNext recorded near you, and where. `undefined` when it has recorded
  * nobody, which is the only case the caller has to explain to the user.
  */

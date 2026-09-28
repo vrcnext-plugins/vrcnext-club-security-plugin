@@ -15,7 +15,7 @@ import { collectAvatarFacts, collectFacts, type Joiner } from './src/facts.js';
 import { matchingPresets, presetMatches } from './src/filters.js';
 import { notify } from './src/notify.js';
 import { ReportPanel } from './src/panel.js';
-import { lastJoin } from './src/replay.js';
+import { lastJoin, selfCheck, type Replay } from './src/replay.js';
 import { AVATAR_CHECKS, evaluate } from './src/requirements.js';
 import { type Report } from './src/report.js';
 import { settings, type Preset } from './src/settings.js';
@@ -36,6 +36,8 @@ const INSTANCE_REFRESH_MS = 30_000;
  * changes, which it normally does on the first or second try.
  */
 const ARRIVAL_RETRY_MS: readonly number[] = [1_000, 2_000, 4_000, 8_000];
+/** How many players a room check looks up. One round of lookups each, and clubs get busy. */
+const MAX_ROOM_CHECK = 12;
 
 class ClubSecurity {
   readonly #ctx: Ctx;
@@ -59,6 +61,8 @@ class ClubSecurity {
     this.#panel = new ReportPanel(ctx, {
       currentInstance: () => this.#instance,
       sendTest: () => this.#sendTest(),
+      testSelf: () => this.#testSelf(),
+      checkEveryoneHere: () => this.#checkEveryoneHere(),
       onVisibility: (visible) => {
         this.#panelVisible = visible;
         this.#syncTimer();
@@ -240,41 +244,38 @@ class ClubSecurity {
     }
   }
 
-  /** Shows a report in the panel, writes it to the log and fans it out to the channels. */
-  async #send(report: Report): Promise<void> {
+  /**
+   * Shows a report in the panel, writes it to the log and fans it out to the channels.
+   *
+   * `deliver: false` stops at the panel. A dry check of yourself or of the room is something a
+   * moderator may want to run repeatedly, and every run reaching the club's Discord would make
+   * the button unusable for exactly the person it is for.
+   */
+  async #send(report: Report, deliver = true): Promise<void> {
     this.#panel.push(report);
     const what = report.kind === 'avatar' ? 'switched avatar' : 'joined';
     this.#ctx.logger.info(`${report.preset.name}: ${report.joiner.name} ${what} — ${report.evaluation.verdict}` +
       (report.evaluation.checks.length === 0 ? '' : ` (${report.evaluation.checks.map((c) => `${c.label}: ${c.detail}`).join(', ')})`));
-    await notify(this.#ctx, report);
+    if (deliver) await notify(this.#ctx, report);
+  }
+
+  /** The enabled presets, or a toast saying there are none to test with. */
+  #testablePresets(): readonly Preset[] {
+    const presets = this.#ctx.settings.get('presets').filter((preset) => preset.enabled);
+    if (presets.length === 0) this.#ctx.notifications.toast({ message: 'No enabled preset to test.', ok: false });
+    return presets;
   }
 
   /**
-   * The last join VRCNext recorded, replayed through every enabled preset.
+   * One player through every enabled preset, filters and whitelists ignored.
    *
-   * Each preset evaluates the same real player with its own requirements, so the test shows
-   * what that preset would actually have reported rather than a made-up verdict. Filters are
-   * not applied — the point is to exercise the channels — and a preset whose filters would not
-   * have matched says so in the log.
+   * Ignoring them is the point of a test: a preset that would not have watched this instance
+   * still says what it would have said, and a whitelisted player still gets a verdict. Which
+   * presets would really have matched is in the log rather than in the verdict.
    */
-  async #sendTest(): Promise<void> {
-    const presets = this.#ctx.settings.get('presets').filter((preset) => preset.enabled);
-    if (presets.length === 0) {
-      this.#ctx.notifications.toast({ message: 'No enabled preset to test.', ok: false });
-      return;
-    }
-    const replay = await lastJoin({
-      vrchat: this.#ctx.vrchat,
-      signal: this.#ctx.signal,
-      currentInstance: this.#instance,
-    });
-    if (replay === undefined) {
-      this.#ctx.notifications.toast({ message: 'VRCNext has not recorded anyone yet; nothing to replay.', ok: false });
-      return;
-    }
+  async #runTest(replay: Replay, presets: readonly Preset[], deliver: boolean): Promise<void> {
     const { joiner, instance } = replay;
-    if (!replay.located) this.#ctx.logger.warn(`Where ${joiner.name} was met is not recorded; the world and instance placeholders will be empty.`);
-
+    if (!replay.located) this.#ctx.logger.warn(`Where ${joiner.name} was last seen is not recorded; the report uses a stand-in instance.`);
     const facts = await collectFacts(this.#ctx.vrchat, joiner, instance, {
       deadlineMs: this.#ctx.settings.get('collectTimeoutSecs') * 1000,
       signal: this.#ctx.signal,
@@ -284,10 +285,80 @@ class ClubSecurity {
       if (!presetMatches(preset, instance)) {
         this.#ctx.logger.info(`Test: "${preset.name}" would not have watched this instance; reporting anyway.`);
       }
-      await this.#send({ at: Date.now(), kind: 'join', preset, joiner, instance, facts, evaluation: evaluate(preset, facts) });
+      await this.#send({ at: Date.now(), kind: 'join', preset, joiner, instance, facts, evaluation: evaluate(preset, facts) }, deliver);
     }
+  }
+
+  /**
+   * You, through every enabled preset — the one player the plugin otherwise never reports.
+   *
+   * `#isSelf` and the whitelist exist so a moderator's own arrivals stay out of the channel,
+   * which also means there is no way to find out how a preset's rules treat you. This is that
+   * way. It never reaches the channels: the answer belongs on screen.
+   */
+  async #testSelf(): Promise<void> {
+    const presets = this.#testablePresets();
+    if (presets.length === 0) return;
+    const replay = await selfCheck({ vrchat: this.#ctx.vrchat, signal: this.#ctx.signal, currentInstance: this.#instance });
+    if (replay === undefined) {
+      this.#ctx.notifications.toast({ message: 'Not signed in to VRChat yet, so there is no account to check.', ok: false });
+      return;
+    }
+    await this.#runTest(replay, presets, false);
     this.#ctx.notifications.toast({
-      message: `Replayed ${joiner.name} through ${String(presets.length)} preset(s).`,
+      message: `Checked yourself against ${String(presets.length)} preset(s); shown here only.`,
+    });
+  }
+
+  /**
+   * Everyone in your instance right now, checked without sending anything.
+   *
+   * The door check: who in this room would the rules have turned away? Bounded, because it is
+   * one round of lookups per player and a full instance is eighty of them.
+   */
+  async #checkEveryoneHere(): Promise<void> {
+    const presets = this.#testablePresets();
+    if (presets.length === 0) return;
+    const instance = this.#instance;
+    if (instance === undefined || instance.users.length === 0) {
+      this.#ctx.notifications.toast({ message: 'Not in an instance VRCNext can see anyone in.', ok: false });
+      return;
+    }
+    const self = this.#ctx.vrchat.self();
+    const here = instance.users.filter((user) => user.id !== '' && user.id !== self?.id).slice(0, MAX_ROOM_CHECK);
+    if (here.length === 0) {
+      this.#ctx.notifications.toast({ message: 'Nobody else is here.', ok: false });
+      return;
+    }
+    for (const user of here) {
+      await this.#runTest({ joiner: { name: user.displayName, userId: user.id }, instance, located: true }, presets, false);
+    }
+    const capped = instance.users.length - 1 > MAX_ROOM_CHECK ? ` (first ${String(MAX_ROOM_CHECK)})` : '';
+    this.#ctx.notifications.toast({ message: `Checked ${String(here.length)} player(s) here${capped}; shown here only.` });
+  }
+
+  /**
+   * The last join VRCNext recorded, replayed through every enabled preset.
+   *
+   * Each preset evaluates the same real player with its own requirements, so the test shows
+   * what that preset would actually have reported rather than a made-up verdict. This one does
+   * reach the channels: exercising them is what it is for.
+   */
+  async #sendTest(): Promise<void> {
+    const presets = this.#testablePresets();
+    if (presets.length === 0) return;
+    const replay = await lastJoin({
+      vrchat: this.#ctx.vrchat,
+      signal: this.#ctx.signal,
+      currentInstance: this.#instance,
+    });
+    if (replay === undefined) {
+      this.#ctx.notifications.toast({ message: 'VRCNext has not recorded anyone yet; nothing to replay.', ok: false });
+      return;
+    }
+    await this.#runTest(replay, presets, true);
+    this.#ctx.notifications.toast({
+      message: `Replayed ${replay.joiner.name} through ${String(presets.length)} preset(s).`,
     });
   }
 }

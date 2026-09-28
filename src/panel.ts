@@ -19,6 +19,10 @@ const VERDICT_TONE: Readonly<Record<Verdict, UiBadgeTone>> = { met: 'ok', unveri
 export interface PanelDeps {
   readonly currentInstance: () => VrcInstance | undefined;
   readonly sendTest: () => Promise<void>;
+  /** You, through every enabled preset, with the self and whitelist skips bypassed. */
+  readonly testSelf: () => Promise<void>;
+  /** Everyone in your instance right now, checked without sending anything. */
+  readonly checkEveryoneHere: () => Promise<void>;
   /** Told when the tab comes on screen and when it leaves, so polling can follow the user. */
   readonly onVisibility: (visible: boolean) => void;
 }
@@ -29,6 +33,8 @@ export class ReportPanel {
   readonly #reports: Report[] = [];
   #status: HTMLElement | undefined;
   #list: HTMLElement | undefined;
+  /** Kept so the room check can grey out the moment you leave the instance. */
+  #roomButton: HTMLButtonElement | undefined;
 
   constructor(ctx: Ctx, deps: PanelDeps) {
     this.#ctx = ctx;
@@ -68,6 +74,7 @@ export class ReportPanel {
     const k = this.#ctx.ui.kit;
     if (this.#status !== undefined) k.setChildren(this.#status, this.#statusRows());
     if (this.#list !== undefined) k.setChildren(this.#list, this.#reportRows());
+    if (this.#roomButton !== undefined) this.#roomButton.disabled = this.#deps.currentInstance() === undefined;
   }
 
   #render(tab: HTMLElement): void {
@@ -78,10 +85,33 @@ export class ReportPanel {
       title: 'Actions',
       icon: 'build',
       children: [
-        k.description('A test replays the last player VRCNext recorded through every enabled preset, each with its own requirements. It reads VRCNext’s own records, so it works with VRChat closed.'),
-        k.description('Green: every requirement verified. Orange: something could not be checked. Red: a requirement was checked and not met.'),
+        // Buttons with hover text rather than paragraphs: what each one does fits in its label,
+        // and a moderator opening this tab mid-shift is looking for a control, not a briefing.
         k.buttonRow(
-          k.button({ label: 'Replay last join', icon: 'send', onClick: () => { void this.#deps.sendTest(); } }),
+          k.button({
+            label: 'Test self',
+            icon: 'person_check',
+            title: 'Runs your own account through every enabled preset, ignoring the rules that normally keep you out of reports. Shown here only — nothing is sent. Uses your current instance, or the last one VRCNext recorded you in, or a stand-in when it has neither.',
+            onClick: () => { void this.#deps.testSelf(); },
+          }),
+          this.#roomButton = k.button({
+            label: 'Check everyone here',
+            icon: 'groups',
+            disabled: this.#deps.currentInstance() === undefined,
+            title: 'Checks every player in your instance against every enabled preset, without sending anything. Needs VRChat running.',
+            onClick: () => { void this.#deps.checkEveryoneHere(); },
+          }),
+          k.button({
+            label: 'Replay last join',
+            icon: 'send',
+            title: 'Replays the last player VRCNext recorded through every enabled preset and sends the reports to their channels — the one button that exercises Discord, desktop and VR. Works with VRChat closed.',
+            onClick: () => { void this.#deps.sendTest(); },
+          }),
+        ),
+        k.badges(
+          k.badge('ok', '✅ all verified'),
+          k.badge('warning', '⚠️ not checkable'),
+          k.badge('err', '⛔ requirement not met'),
         ),
       ],
     });

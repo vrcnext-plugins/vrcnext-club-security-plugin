@@ -29,6 +29,19 @@ The verdict reaches your templates as `{result}`, `{resultText}`, `{resultEmoji}
 | Channels | In-app toast, Desktop, VR overlay, Discord | Per preset, so a strict club can post to Discord while a relaxed one only toasts. |
 | Formats | Report template, VR overlay template, Discord embed | The text report, the plain-text one for VR, and the embed. |
 
+## The Actions card
+
+Three buttons on the Club Security tab, each running the presets you have enabled:
+
+| Button | What it does | Sends? |
+| :--- | :--- | :--- |
+| **Test self** | Runs *your own* account through every enabled preset, bypassing the self check and the exception list that normally keep you out of reports. With VRChat closed it uses the last instance VRCNext recorded you in, and a clearly fake `Example World` when it has none. | No — panel only |
+| **Check everyone here** | Every player in your instance against every enabled preset, up to twelve. The door check: who in this room would the rules have turned away? | No — panel only |
+| **Replay last join** | The last player VRCNext recorded, through every preset, to their channels. The one button that exercises Discord, desktop and VR. Works with VRChat closed. | Yes |
+
+All three ignore the instance filters: a preset that would not have watched this instance still
+says what it would have said, and notes that in the log. Hover a button for the detail.
+
 ## Avatar switches
 
 A club's avatar rules are usually broken *after* the door, by someone who came in on a light
