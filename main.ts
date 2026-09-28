@@ -31,8 +31,8 @@ const INSTANCE_REFRESH_MS = 30_000;
  * How long after arriving in a world to keep asking where we are.
  *
  * VRChat's own API lags the log line: reading the instance the moment `Joining wrld_…` appears
- * usually still answers with the world we just left, and someone joining in that window would
- * then be matched against the previous instance's filters. These delays re-ask until the answer
+ * usually still answers with the world we just left, and someone joining while that is true would
+ * be matched against the previous instance's filters. These delays re-ask until the answer
  * changes, which it normally does on the first or second try.
  */
 const ARRIVAL_RETRY_MS: readonly number[] = [1_000, 2_000, 4_000, 8_000];

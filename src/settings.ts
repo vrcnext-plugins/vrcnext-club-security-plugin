@@ -324,7 +324,7 @@ export const settings = {
   settleSecs: {
     kind: 'number',
     label: 'Seconds to ignore after you join',
-    description: 'VRChat logs a join for everyone already there when you enter. Joins inside this window are not reported.',
+    description: 'VRChat logs a join for everyone already there when you enter. Joins inside this settling time are not reported.',
     default: 15,
     min: 3,
     max: 120,
