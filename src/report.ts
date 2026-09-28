@@ -152,6 +152,7 @@ export function reportValues(report: Report): TemplateValues {
     requirementsText: requirementsText(evaluation.checks),
     logText: activityLog(facts.timeline, LOG_LINES, (id) => facts.timelineGroups.get(id)),
     profileUrl: vrchatUrl('user', joiner.userId),
+    userImageUrl: facts.userImageUrl,
     platform: facts.platform,
     platformEmoji: PLATFORM_EMOJI.find(([re]) => re.test(facts.platform))?.[1] ?? '❔',
     isFriend: facts.isFriend,

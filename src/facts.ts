@@ -23,6 +23,8 @@ export interface Facts {
   readonly ageVerificationStatus: string;
   readonly isFriend: boolean | undefined;
   readonly platform: string;
+  /** The joiner's profile picture, for the embed's author line. `''` when unreadable. */
+  readonly userImageUrl: string;
   readonly avatarId: string;
   readonly avatarName: string;
   readonly avatarImageUrl: string;
@@ -53,6 +55,7 @@ export const UNKNOWN_FACTS: Facts = {
   ageVerificationStatus: '',
   isFriend: undefined,
   platform: '',
+  userImageUrl: '',
   avatarId: '',
   avatarName: '',
   avatarImageUrl: '',
@@ -154,6 +157,7 @@ export async function collectFacts(
     ageVerificationStatus: user?.ageVerificationStatus ?? inInstance?.ageVerificationStatus ?? '',
     isFriend: user?.isFriend,
     platform: user?.platform ?? inInstance?.platform ?? '',
+    userImageUrl: user?.imageUrl ?? inInstance?.imageUrl ?? '',
     ...(avatar ?? { avatarId: '', avatarName: '', avatarImageUrl: '', pcRank: '', questRank: '' }),
     groupIds: groups,
     rejoin: location === '' ? UNKNOWN_REJOIN : rejoinIn(timeline, location),

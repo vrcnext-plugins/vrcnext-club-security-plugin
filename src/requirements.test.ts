@@ -13,6 +13,7 @@ function facts(overrides: Partial<Facts> = {}): Facts {
     ageVerificationStatus: '18+',
     isFriend: true,
     platform: 'standalonewindows',
+    userImageUrl: 'https://img.test/u.png',
     avatarId: 'avtr_1',
     avatarName: 'Ava',
     avatarImageUrl: '',

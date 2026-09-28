@@ -34,8 +34,13 @@ export const DEFAULT_TEMPLATE_VR = [
  * no history for rather than showing an empty box.
  */
 export const DEFAULT_EMBED = {
+  // The title is not a link: the profile belongs on the author line, where Discord puts the
+  // person an embed is about, and a title that navigates somewhere is a surprise in a report
+  // whose subject is already named twice.
   title: '{name} {eventText}',
-  url: '{profileUrl}',
+  authorName: '{userId}',
+  authorUrl: '{profileUrl}',
+  authorIconUrl: '{userImageUrl}',
   color: '{resultColor}',
   thumbnailUrl: '{avatarImageUrl}',
   footerIconUrl: 'https://vrcnext.com/logo.png',
@@ -55,6 +60,7 @@ export const TEMPLATE_VARIABLES = [
   'failedText', 'unverifiedText', 'ageVerified', 'ageVerifiedText', 'ageVerifiedEmoji', 'ageStatus',
   'pcRank', 'pcRankText', 'pcRankEmoji', 'questRank', 'questRankText', 'questRankEmoji',
   'avatar', 'avatarId', 'avatarImageUrl', 'avatarUrl', 'avatarLink', 'avatarPlain', 'ranksText', 'requirementsText', 'logText',
+  'userImageUrl',
   'trustScore', 'trustScoreText', 'trustScoreEmoji', 'trustText',
   'profileUrl', 'platform', 'platformEmoji', 'isFriend', 'friendText',
   'inGroup', 'inGroupText', 'inGroupEmoji', 'rejoin', 'rejoinText', 'rejoinEmoji', 'rejoinAgo', 'rejoinSince', 'rejoinAt',

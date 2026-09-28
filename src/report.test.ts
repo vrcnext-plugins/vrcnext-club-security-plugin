@@ -15,6 +15,7 @@ function facts(overrides: Partial<Facts> = {}): Facts {
     ageVerificationStatus: '18+',
     isFriend: false,
     platform: 'standalonewindows',
+    userImageUrl: 'https://img.test/u.png',
     avatarId: 'avtr_1',
     avatarName: 'Ava',
     avatarImageUrl: 'https://img.test/a.png',
@@ -66,7 +67,12 @@ test('the default embed renders with the verdict colour and the avatar thumbnail
   const embed = renderEmbed(completeEmbed(DEFAULT_EMBED), reportValues(report()), { at: new Date(0) });
   assert.ok(embed !== undefined);
   assert.equal(embed.title, 'Tupper joined');
-  assert.equal(embed.url, 'https://vrchat.com/home/user/usr_1');
+  assert.equal(embed.url, undefined, 'the title does not navigate; the author line carries the profile');
+  assert.deepEqual(embed.author, {
+    name: 'usr_1',
+    url: 'https://vrchat.com/home/user/usr_1',
+    icon_url: 'https://img.test/u.png',
+  });
   assert.equal(embed.color, 0x3ba55d);
   assert.deepEqual(embed.thumbnail, { url: 'https://img.test/a.png' });
   assert.equal(embed.footer?.text, 'VRCNext Club Security · Club · The Club · #1 · Group Public');

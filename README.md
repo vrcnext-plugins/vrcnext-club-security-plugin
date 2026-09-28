@@ -87,7 +87,8 @@ with a single font and shows nothing for emoji.
 | Kind | Variables |
 | :--- | :--- |
 | Verdict | `result` `resultText` `resultEmoji` `resultColor` `checksText` `checksPlainText` `failedText` `unverifiedText` |
-| Player | `name` `userId` (`playerId` is the old name) `platform` `platformEmoji` `isFriend` `friendText` `ageVerified` `ageVerifiedText` `ageVerifiedEmoji` `ageStatus` |
+| Player | `name` `userId` (`playerId` is the old name) `profileUrl` `userImageUrl` `platform` `platformEmoji` `isFriend` `friendText` `ageVerified` `ageVerifiedText` `ageVerifiedEmoji` `ageStatus` |
+| Trust | `trustScore` `trustScoreText` `trustScoreEmoji` `trustText` — VRChat standing as a percentage, empty when the profile could not be read |
 | Avatar | `avatar` `avatarId` `avatarImageUrl` `avatarLink` `avatarPlain` `ranksText` `pcRank` `pcRankText` `pcRankEmoji` `questRank` `questRankText` `questRankEmoji` |
 | Activity | `logText` — the player's recent records as Discord lines |
 | Club | `preset` `inGroup` `inGroupText` `inGroupEmoji` |
