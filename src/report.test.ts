@@ -23,6 +23,7 @@ function facts(overrides: Partial<Facts> = {}): Facts {
     groupIds: ['grp_a'],
     rejoin: { seenHere: false, lastAt: undefined },
     timeline: undefined,
+    timelineGroups: new Map(),
     trust: undefined,
     ...overrides,
   };
@@ -102,7 +103,7 @@ test('the activity field is dropped when VRCNext has no history for the player',
   assert.ok(withLog !== undefined);
   const logged = withLog.fields ?? [];
   assert.equal(logged.length, 3);
-  assert.equal(logged[2]?.value, '- changed avatar <t:1790503200:R>');
+  assert.equal(logged[2]?.value, '- Changed avatar <t:1790503200:R>');
 
   // `renderEmbed` drops a field that rendered empty, so a stranger's report is two fields.
   const without = renderEmbed(completeEmbed(DEFAULT_EMBED), reportValues(report()), { at: new Date(0) });

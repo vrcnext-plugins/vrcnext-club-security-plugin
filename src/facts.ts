@@ -7,7 +7,7 @@
  * parallel and each one degrades to "unknown" on its own rather than holding up the report.
  */
 
-import { trustScore, type PerformanceRank, type TrustScore, type VrcInstance, type VrcTimelineEvent, type VrchatApi } from '@vrcnext/plugin-api';
+import { parseLocation, recentUserEvents, trustScore, type PerformanceRank, type TrustScore, type VrcInstance, type VrcTimelineEvent, type VrchatApi } from '@vrcnext/plugin-api';
 
 import { rejoinIn, UNKNOWN_REJOIN, type Rejoin } from './history.js';
 
@@ -37,6 +37,11 @@ export interface Facts {
    */
   readonly timeline: readonly VrcTimelineEvent[] | undefined;
   /**
+   * Names for the groups whose instances appear in {@link timeline}, by `grp_…`. A record only
+   * carries the id, and a log line that said `grp_9f2…` would be worse than saying nothing.
+   */
+  readonly timelineGroups: ReadonlyMap<string, string>;
+  /**
    * The profile score VRCNext used to show on every profile; `undefined` when the profile
    * itself could not be read, since a score out of nothing would read as distrust.
    */
@@ -56,6 +61,7 @@ export const UNKNOWN_FACTS: Facts = {
   groupIds: undefined,
   rejoin: UNKNOWN_REJOIN,
   timeline: undefined,
+  timelineGroups: new Map(),
   trust: undefined,
 };
 
@@ -101,6 +107,30 @@ export async function collectAvatarFacts(
   return { ...UNKNOWN_FACTS, ...(avatar ?? {}) };
 }
 
+/**
+ * Names for the groups the log will mention, looked up after the timeline is in.
+ *
+ * Bounded on purpose: only the instances that survive deduplication into the visible lines can
+ * need a name, and a report is not worth a dozen group lookups. A lookup that fails leaves the
+ * line without the "by …" part rather than holding up the report.
+ */
+async function groupNames(
+  vrchat: VrchatApi,
+  timeline: readonly VrcTimelineEvent[] | undefined,
+  signal: AbortSignal,
+): Promise<ReadonlyMap<string, string>> {
+  const ids = [...new Set(
+    recentUserEvents(timeline)
+      .map((entry) => parseLocation(entry.event.location).groupId)
+      .filter((id) => id !== ''),
+  )];
+  const found = await Promise.all(ids.map(async (id) => {
+    const group = await vrchat.group(id, { signal }).catch(() => undefined);
+    return [id, group?.name ?? ''] as const;
+  }));
+  return new Map(found.filter(([, name]) => name !== ''));
+}
+
 /** Runs every lookup in parallel and returns whatever arrived before the deadline. */
 export async function collectFacts(
   vrchat: VrchatApi,
@@ -117,6 +147,7 @@ export async function collectFacts(
     options.wantsGroups ? vrchat.userGroups(joiner.userId, { signal }).then((g) => g.map((x) => x.id), () => undefined) : Promise.resolve(undefined),
     vrchat.userTimeline(joiner.userId, { signal }).catch(() => undefined),
   ]);
+  const timelineGroups = await groupNames(vrchat, timeline, signal);
   const inInstance = instance?.users.find((u) => u.id === joiner.userId);
   return {
     ageVerified: user?.ageVerified ?? inInstance?.ageVerified,
@@ -127,6 +158,7 @@ export async function collectFacts(
     groupIds: groups,
     rejoin: location === '' ? UNKNOWN_REJOIN : rejoinIn(timeline, location),
     timeline,
+    timelineGroups,
     // Badges and uploaded content are not in what VRCNext pushes, so those criteria are left
     // out of the total rather than counted as failures.
     trust: user === undefined ? undefined : trustScore({

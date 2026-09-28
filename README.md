@@ -70,10 +70,14 @@ with a single font and shows nothing for emoji.
 | :--- | :--- |
 | Verdict | `result` `resultText` `resultEmoji` `resultColor` `checksText` `checksPlainText` `failedText` `unverifiedText` |
 | Player | `name` `userId` (`playerId` is the old name) `platform` `platformEmoji` `isFriend` `friendText` `ageVerified` `ageVerifiedText` `ageVerifiedEmoji` `ageStatus` |
-| Avatar | `avatar` `avatarId` `avatarImageUrl` `pcRank` `pcRankText` `pcRankEmoji` `questRank` `questRankText` `questRankEmoji` |
+| Avatar | `avatar` `avatarId` `avatarImageUrl` `avatarLink` `avatarPlain` `ranksText` `pcRank` `pcRankText` `pcRankEmoji` `questRank` `questRankText` `questRankEmoji` |
+| Activity | `logText` — the player's recent records as Discord lines |
 | Club | `preset` `inGroup` `inGroupText` `inGroupEmoji` |
 | History | `rejoin` `rejoinText` `rejoinEmoji` `rejoinAgo` `rejoinSince` `rejoinAt` |
 | Place and time | `world` `worldId` `instanceType` `instanceId` `location` `time` `date` `timestamp` |
+
+`avatar`, `avatarLink` and `avatarPlain` are empty when VRCNext cannot name the avatar, which
+drops the line — and, in an embed, the whole field — rather than printing "Unknown".
 
 Booleans (`ageVerified`, `inGroup`, `rejoin`, `isFriend`) are empty when unknown, so
 `{{ "yes" if rejoin else "no" }}` and `{% if inGroup == false %}…{% endif %}` both behave. A
@@ -89,6 +93,7 @@ Everything goes through `ctx.vrchat`, which reads VRCNext's data **without openi
 | Avatar and ranks | The avatar the player wears, resolved through VRCNext's avatar databases, then its performance ranks. | Only works when one of the databases knows the avatar; an unknown rank is unverified, never a failure. |
 | Group membership | The groups the user shows publicly. | A member who hides the membership is unverified, not a failure. |
 | Friendship | Your friend list. | — |
+| Recent activity | VRCNext's timeline, worded by the plugin system: `Blocked by you`, ``Visited `Jellybean` #52792 (Friends+)``, `Friend request from **X**`. Identical records collapse into one line with a `×2`, and a group instance names its group when VRCNext knows it. | Ten records deep per player, so a busy account's log is short. |
 | Rejoin | VRCNext's timeline: the player's ten most recent events, each with its location. Yes when one of them is this exact instance (same world **and** instance id) from before this join. | Survives restarts and reaches back to when VRCNext was installed, but only ten events deep per player. |
 
 Each lookup runs in parallel and degrades to "unknown" on its own timeout rather than holding up

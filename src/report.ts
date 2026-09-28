@@ -18,7 +18,7 @@ import {
   type VrcInstance,
 } from '@vrcnext/plugin-api';
 
-import { activityLog } from './activity.js';
+import { activityLog, LOG_LINES } from './activity.js';
 import type { Facts, Joiner } from './facts.js';
 import { VERDICT_COLOR, VERDICT_EMOJI, VERDICT_TEXT, type Evaluation } from './requirements.js';
 import { DEFAULT_TEMPLATE, type Preset } from './settings.js';
@@ -137,6 +137,11 @@ export function reportValues(report: Report): TemplateValues {
     avatarLink: facts.avatarName === ''
       ? undefined
       : (facts.avatarId === '' ? facts.avatarName : `["${facts.avatarName}"](${vrchatUrl('avatar', facts.avatarId)})`),
+    // Empty, not "Unknown", when VRCNext could not name the avatar: an embed field whose value
+    // renders empty is dropped, and a box saying "Unknown" is worse than no box.
+    avatarPlain: facts.avatarName === ''
+      ? undefined
+      : `${facts.avatarName} (PC ${rankLabel(facts.pcRank)} · Quest ${rankLabel(facts.questRank)})`,
     trustScore: facts.trust?.percent,
     trustScoreText: facts.trust === undefined
       ? undefined
@@ -145,7 +150,7 @@ export function reportValues(report: Report): TemplateValues {
     trustText: facts.trust?.description,
     ranksText: ranksText(facts),
     requirementsText: requirementsText(evaluation.checks),
-    logText: activityLog(facts.timeline),
+    logText: activityLog(facts.timeline, LOG_LINES, (id) => facts.timelineGroups.get(id)),
     profileUrl: vrchatUrl('user', joiner.userId),
     platform: facts.platform,
     platformEmoji: PLATFORM_EMOJI.find(([re]) => re.test(facts.platform))?.[1] ?? '❔',

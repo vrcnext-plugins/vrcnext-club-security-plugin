@@ -12,7 +12,7 @@ import { INSTANCE_TYPES, PERFORMANCE_RANKS, instanceTypeLabel, type SettingsSche
 export const DEFAULT_TEMPLATE = [
   '{resultEmoji} {name} {eventText} · {preset}',
   '{checksText}',
-  'Avatar: {avatar} (PC {pcRankText} · Quest {questRankText})',
+  'Avatar: {avatarPlain}',
   '{{ "Seen here before, " + rejoinAgo if rejoin else "" }}',
 ].join('\n');
 
@@ -44,7 +44,7 @@ export const DEFAULT_EMBED = {
   fields: [
     { name: 'Requirements', value: '{requirementsText}', inline: true },
     { name: 'Trust Score', value: '{trustScoreText}', inline: true },
-    { name: 'Avatar', value: '{{ avatarLink if avatarLink else "Unknown" }}\n{ranksText}', inline: true },
+    { name: 'Avatar', value: '{avatarLink}\n{ranksText}', inline: true },
     { name: 'Recently', value: '{logText}', inline: false },
   ],
 } as const;
@@ -54,7 +54,7 @@ export const TEMPLATE_VARIABLES = [
   'name', 'userId', 'preset', 'event', 'eventText', 'result', 'resultText', 'resultEmoji', 'resultColor', 'checksText', 'checksPlainText',
   'failedText', 'unverifiedText', 'ageVerified', 'ageVerifiedText', 'ageVerifiedEmoji', 'ageStatus',
   'pcRank', 'pcRankText', 'pcRankEmoji', 'questRank', 'questRankText', 'questRankEmoji',
-  'avatar', 'avatarId', 'avatarImageUrl', 'avatarUrl', 'avatarLink', 'ranksText', 'requirementsText', 'logText',
+  'avatar', 'avatarId', 'avatarImageUrl', 'avatarUrl', 'avatarLink', 'avatarPlain', 'ranksText', 'requirementsText', 'logText',
   'trustScore', 'trustScoreText', 'trustScoreEmoji', 'trustText',
   'profileUrl', 'platform', 'platformEmoji', 'isFriend', 'friendText',
   'inGroup', 'inGroupText', 'inGroupEmoji', 'rejoin', 'rejoinText', 'rejoinEmoji', 'rejoinAgo', 'rejoinSince', 'rejoinAt',
