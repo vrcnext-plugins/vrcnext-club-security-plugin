@@ -87,7 +87,11 @@ export class ReportPanel {
       children: [
         // Buttons with hover text rather than paragraphs: what each one does fits in its label,
         // and a moderator opening this tab mid-shift is looking for a control, not a briefing.
-        k.buttonRow(
+        //
+        // A grid rather than a row, so three buttons are three equal columns that become one
+        // column when the card is narrow — a plain row wrapped two-then-one, which reads as two
+        // groups that mean something.
+        k.grid([
           k.button({
             label: 'Test self',
             icon: 'person_check',
@@ -107,12 +111,7 @@ export class ReportPanel {
             title: 'Replays the last player VRCNext recorded through every enabled preset and sends the reports to their channels. Works with VRChat closed.',
             onClick: () => { void this.#deps.sendTest(); },
           }),
-        ),
-        k.badges(
-          k.badge('ok', '✅ all verified'),
-          k.badge('warning', '⚠️ not checkable'),
-          k.badge('err', '⛔ requirement not met'),
-        ),
+        ], { min: 150, maxColumns: 3 }),
       ],
     });
     tab.append(k.layout(k.pair(this.#status, actions), this.#list));
@@ -164,10 +163,26 @@ export class ReportPanel {
     return k.badge('neutral', lastAt === undefined ? 'Seen here before' : `Seen ${timeAgo(lastAt)}`);
   }
 
+  /**
+   * What the three pill colours mean.
+   *
+   * It belongs here and not in Actions: it explains the pills on the rows below it, and under
+   * the buttons it read as a status line about the button above it.
+   */
+  #legend(): HTMLElement {
+    const k = this.#ctx.ui.kit;
+    return k.badges(
+      k.badge('ok', `${VERDICT_EMOJI.met} all verified`),
+      k.badge('warning', `${VERDICT_EMOJI.unverified} not checkable`),
+      k.badge('err', `${VERDICT_EMOJI.failed} requirement not met`),
+    );
+  }
+
   #reportRows(): readonly (HTMLElement | DocumentFragment)[] {
     const k = this.#ctx.ui.kit;
     if (this.#reports.length === 0) return [k.emptyState('No joins reported yet.')];
-    return this.#reports.map((report) => {
+    const rows: (HTMLElement | DocumentFragment)[] = [this.#legend()];
+    rows.push(...this.#reports.map((report) => {
       const time = new Date(report.at).toLocaleTimeString();
       const what = report.kind === 'avatar' ? ' · switched avatar' : '';
       const verdict = report.evaluation.verdict;
@@ -176,6 +191,7 @@ export class ReportPanel {
         detail: k.badges(...this.#pills(report)),
         value: k.badge(VERDICT_TONE[verdict], VERDICT_TEXT[verdict]),
       });
-    });
+    }));
+    return rows;
   }
 }
