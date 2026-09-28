@@ -25,8 +25,17 @@ type Ctx = PluginContext<typeof settings>;
 /** VRCNext's parsed game-log kinds for `[Behaviour] OnPlayerJoined` and `Joining wrld_…`. */
 const JOIN_EVENT = 'gl_player_join';
 const WORLD_JOIN_EVENT = 'gl_world_join';
-/** How often the current instance is re-read while the tab is open, so its status stays honest. */
+/** How often the current instance is re-read, while anything is actually watching it. */
 const INSTANCE_REFRESH_MS = 30_000;
+/**
+ * How long after arriving in a world to keep asking where we are.
+ *
+ * VRChat's own API lags the log line: reading the instance the moment `Joining wrld_…` appears
+ * usually still answers with the world we just left, and someone joining in that window would
+ * then be matched against the previous instance's filters. These delays re-ask until the answer
+ * changes, which it normally does on the first or second try.
+ */
+const ARRIVAL_RETRY_MS: readonly number[] = [1_000, 2_000, 4_000, 8_000];
 
 class ClubSecurity {
   readonly #ctx: Ctx;
@@ -41,28 +50,81 @@ class ClubSecurity {
    * present when the local player arrives, in one burst right after the local player's own line.
    */
   #settledAt = 0;
+  /** Set while the plugin's tab is the one on screen; the host tells us when that changes. */
+  #panelVisible = false;
+  #timer: ReturnType<typeof setInterval> | undefined;
 
   constructor(ctx: Ctx) {
     this.#ctx = ctx;
     this.#panel = new ReportPanel(ctx, {
       currentInstance: () => this.#instance,
       sendTest: () => this.#sendTest(),
+      onVisibility: (visible) => {
+        this.#panelVisible = visible;
+        this.#syncTimer();
+      },
     });
   }
 
   start(): void {
     this.#ctx.gameLog.onType(WORLD_JOIN_EVENT, () => {
       this.#startSettling();
-      void this.#refreshInstance();
+      void this.#followArrival();
     });
     this.#ctx.gameLog.onType(JOIN_EVENT, (entry) => {
       void this.#onJoin({ name: entry.message, userId: entry.detail });
     });
     this.#panel.install();
     void this.#refreshInstance();
-    const timer = setInterval(() => { void this.#refreshInstance(); }, INSTANCE_REFRESH_MS);
-    this.#ctx.disposables.add(() => { clearInterval(timer); });
+    this.#ctx.settings.onChange(() => { this.#syncTimer(); });
+    this.#syncTimer();
+    this.#ctx.disposables.add(() => { this.#stopTimer(); });
     this.#ctx.logger.info(`Club Security v${this.#ctx.version} watching for joins.`);
+  }
+
+  /**
+   * Whether re-reading the instance on a timer earns its keep right now.
+   *
+   * Two things need it: the status card, while the user is looking at it, and the avatar watch,
+   * which has nothing else to notice a switch with. With neither, a join reads the instance for
+   * itself, so polling in the background would be work nobody asked for — and on a laptop in a
+   * club, a request every thirty seconds forever.
+   */
+  #shouldPoll(): boolean {
+    return this.#panelVisible
+      || this.#ctx.settings.get('presets').some((preset) => preset.enabled && preset.watchAvatarChanges);
+  }
+
+  #syncTimer(): void {
+    const wanted = this.#shouldPoll();
+    if (wanted === (this.#timer !== undefined)) return;
+    if (!wanted) {
+      this.#stopTimer();
+      return;
+    }
+    this.#timer = setInterval(() => { void this.#refreshInstance(); }, INSTANCE_REFRESH_MS);
+    void this.#refreshInstance();
+  }
+
+  #stopTimer(): void {
+    if (this.#timer === undefined) return;
+    clearInterval(this.#timer);
+    this.#timer = undefined;
+  }
+
+  /** Re-reads where we are until the answer stops being the world we left. */
+  async #followArrival(): Promise<void> {
+    const before = this.#instance?.location;
+    await this.#refreshInstance();
+    for (const delay of ARRIVAL_RETRY_MS) {
+      if (this.#instance?.location !== before) return;
+      await new Promise((resolve) => { setTimeout(resolve, delay); });
+      if (this.#ctx.signal.aborted) return;
+      await this.#refreshInstance();
+    }
+    if (this.#instance?.location === before) {
+      this.#ctx.logger.debug('Arrived in a new instance but VRCNext still reports the old one.');
+    }
   }
 
   async #refreshInstance(): Promise<void> {

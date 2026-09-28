@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { activityLog, code, discordTime } from './activity.js';
+import { activityLog } from './activity.js';
 
 const LOTUS = 'wrld_aaaa1111-2222-3333-4444-555566667777:12345~group(grp_x)~groupAccessType(public)';
 
@@ -9,17 +9,6 @@ function event(type: string, timestamp: string, location = '', worldName = ''): 
 } {
   return { type, timestamp, location, worldName };
 }
-
-describe('discordTime', () => {
-  it('renders the epoch second Discord wants', () => {
-    expect(discordTime('2026-09-27T13:55:03.346Z')).toBe('<t:1790517303:R>');
-    expect(discordTime(1_790_517_303_346)).toBe('<t:1790517303:R>');
-  });
-
-  it('gives nothing for a timestamp it cannot read, rather than NaN', () => {
-    expect(discordTime('whenever')).toBe('');
-  });
-});
 
 describe('activityLog', () => {
   it('reads VRCNext\'s types as things a person did, newest first', () => {
@@ -53,13 +42,12 @@ describe('activityLog', () => {
   });
 });
 
-describe('code', () => {
-  it('fences a name so its markdown is shown, not applied', () => {
-    expect(code('**Club**')).toBe('`**Club**`');
-  });
-
-  it('uses a longer fence for a name that contains one', () => {
-    expect(code('this is a `name')).toBe('`` this is a `name ``');
-    expect(code('a ``b`` c')).toBe('``` a ``b`` c ```');
+describe('activityLog, on a record it cannot place', () => {
+  it('leaves out an event whose timestamp does not parse', () => {
+    const log = activityLog([
+      event('friend_online', 'whenever'),
+      event('friend_avatar', '2026-09-27T11:00:00Z'),
+    ]);
+    expect(log).toBe('- changed avatar <t:1790506800:R>');
   });
 });

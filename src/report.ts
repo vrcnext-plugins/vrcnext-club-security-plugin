@@ -9,6 +9,8 @@
 import {
   TemplateError,
   instanceTypeLabel,
+  rankEmoji,
+  rankLabel,
   renderTemplate,
   trustScoreEmoji,
   timeAgo,
@@ -18,7 +20,7 @@ import {
 
 import { activityLog } from './activity.js';
 import type { Facts, Joiner } from './facts.js';
-import { VERDICT_COLOR, VERDICT_EMOJI, VERDICT_TEXT, rankText, type Evaluation } from './requirements.js';
+import { VERDICT_COLOR, VERDICT_EMOJI, VERDICT_TEXT, type Evaluation } from './requirements.js';
 import { DEFAULT_TEMPLATE, type Preset } from './settings.js';
 
 /** Why a report exists: someone arrived, or someone already here changed avatar. */
@@ -34,11 +36,6 @@ export interface Report {
   readonly facts: Facts;
   readonly evaluation: Evaluation;
 }
-
-/** VRChat's performance rank colours, as emoji. */
-const RANK_EMOJI: Readonly<Record<string, string>> = {
-  Excellent: '🟢', Good: '🔵', Medium: '🟡', Poor: '🟠', VeryPoor: '🔴',
-};
 
 const PLATFORM_EMOJI: readonly (readonly [RegExp, string])[] = [
   [/windows/i, '🖥️'], [/android|quest/i, '📱'], [/ios/i, '🍎'],
@@ -81,7 +78,7 @@ function ranksText(facts: Facts): string {
     ['📱 Quest', facts.questRank] as const,
   ]
     .filter(([, rank]) => rank !== '')
-    .map(([label, rank]) => `- ${label}: ${RANK_EMOJI[rank] ?? '⚪'} ${rankText(rank)}`);
+    .map(([label, rank]) => `- ${label}: ${rankEmoji(rank)} ${rankLabel(rank)}`);
   return lines.join('\n');
 }
 
@@ -106,10 +103,11 @@ export function reportValues(report: Report): TemplateValues {
   const kind = report.kind ?? 'join';
   return {
     name: joiner.name,
-    playerId: joiner.userId,
     event: kind,
     eventText: kind === 'avatar' ? 'switched avatar' : facts.rejoin.seenHere === true ? 'rejoined' : 'joined',
     userId: joiner.userId,
+    /** The name `userId` had before 2.5.0; still rendered so an older template keeps working. */
+    playerId: joiner.userId,
     preset: preset.name,
     result: evaluation.verdict,
     resultText: VERDICT_TEXT[evaluation.verdict],
@@ -126,11 +124,11 @@ export function reportValues(report: Report): TemplateValues {
     ageVerifiedEmoji: triState(facts.ageVerified, '✅', '❌'),
     ageStatus: facts.ageVerificationStatus,
     pcRank: facts.pcRank === '' ? undefined : facts.pcRank,
-    pcRankText: rankText(facts.pcRank),
-    pcRankEmoji: RANK_EMOJI[facts.pcRank] ?? '⚪',
+    pcRankText: rankLabel(facts.pcRank),
+    pcRankEmoji: rankEmoji(facts.pcRank),
     questRank: facts.questRank === '' ? undefined : facts.questRank,
-    questRankText: rankText(facts.questRank),
-    questRankEmoji: RANK_EMOJI[facts.questRank] ?? '⚪',
+    questRankText: rankLabel(facts.questRank),
+    questRankEmoji: rankEmoji(facts.questRank),
     avatar: facts.avatarName,
     avatarId: facts.avatarId,
     avatarImageUrl: facts.avatarImageUrl,
@@ -197,10 +195,11 @@ export function reportLines(report: Report, template: string, onError?: (error: 
 /** Everything a single-line surface can hold. */
 export function reportSummary(report: Report): string {
   const { facts, evaluation } = report;
+  const shortRank = (rank: string): string => (rank === '' ? '?' : rankLabel(rank));
   const bits = [
     VERDICT_TEXT[evaluation.verdict],
-    `PC ${rankText(facts.pcRank).replace('Unknown', '?')}`,
-    `Quest ${rankText(facts.questRank).replace('Unknown', '?')}`,
+    `PC ${shortRank(facts.pcRank)}`,
+    `Quest ${shortRank(facts.questRank)}`,
     facts.rejoin.seenHere === undefined ? 'rejoin ?' : (facts.rejoin.seenHere ? 'rejoin' : 'new'),
   ];
   const what = report.kind === 'avatar' ? 'switched avatar' : 'joined';

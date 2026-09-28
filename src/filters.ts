@@ -10,7 +10,7 @@ import type { Preset } from './settings.js';
 export type InstanceShape = Pick<VrcInstance, 'worldId' | 'instanceType' | 'groupId'>;
 
 export function presetMatches(preset: Preset, instance: InstanceShape): boolean {
-  if (preset.instanceTypes.length > 0 && !preset.instanceTypes.includes(instance.instanceType as (typeof preset.instanceTypes)[number])) return false;
+  if (preset.instanceTypes.length > 0 && !(preset.instanceTypes as readonly string[]).includes(instance.instanceType)) return false;
   if (preset.group !== '' && instance.groupId.toLowerCase() !== preset.group.toLowerCase()) return false;
   if (preset.worlds.length > 0 && !preset.worlds.some((w) => w.toLowerCase() === instance.worldId.toLowerCase())) return false;
   return true;

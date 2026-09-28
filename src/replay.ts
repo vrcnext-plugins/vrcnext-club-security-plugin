@@ -10,7 +10,7 @@
  * in its own database — so a club's webhook can be set up with the game closed.
  */
 
-import { parseLocation, type VrcInstance, type VrchatApi } from '@vrcnext/plugin-api';
+import { newestFirst, parseLocation, type VrcInstance, type VrchatApi } from '@vrcnext/plugin-api';
 
 import type { Joiner } from './facts.js';
 
@@ -41,9 +41,7 @@ export function instanceFrom(location: string, worldName: string): VrcInstance {
 
 /** The most recent timeline event that says where it happened. */
 function lastLocation(events: readonly { timestamp: string; location: string; worldName: string }[]): { location: string; worldName: string } | undefined {
-  return [...events]
-    .filter((event) => event.location !== '')
-    .sort((a, b) => Date.parse(b.timestamp) - Date.parse(a.timestamp))[0];
+  return newestFirst(events).find((event) => event.location !== '');
 }
 
 export interface ReplayOptions {

@@ -7,7 +7,7 @@
  * same world and same instance id, not "met somewhere".
  */
 
-import { parseLocation, type VrcTimelineEvent } from '@vrcnext/plugin-api';
+import { newestFirst, parseLocation, type VrcTimelineEvent } from '@vrcnext/plugin-api';
 
 export interface Rejoin {
   /** `undefined` when VRCNext did not answer in time. */
@@ -38,10 +38,9 @@ export function rejoinIn(
   if (events === undefined) return UNKNOWN_REJOIN;
   const key = parseLocation(location).key;
   if (key === '') return { seenHere: false, lastAt: undefined };
-  const located = events
-    .map((event) => ({ at: Date.parse(event.timestamp), timestamp: event.timestamp, key: parseLocation(event.location).key }))
-    .filter((event) => event.key !== '' && Number.isFinite(event.at))
-    .sort((a, b) => b.at - a.at);
+  const located = newestFirst(events)
+    .map((event) => ({ timestamp: event.timestamp, key: parseLocation(event.location).key }))
+    .filter((event) => event.key !== '');
   const wentElsewhere = located.findIndex((event) => event.key !== key);
   if (wentElsewhere === -1) return { seenHere: false, lastAt: undefined };
   const before = located.slice(wentElsewhere).find((event) => event.key === key);

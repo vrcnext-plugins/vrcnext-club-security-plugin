@@ -69,7 +69,7 @@ with a single font and shows nothing for emoji.
 | Kind | Variables |
 | :--- | :--- |
 | Verdict | `result` `resultText` `resultEmoji` `resultColor` `checksText` `checksPlainText` `failedText` `unverifiedText` |
-| Player | `name` `playerId` `platform` `platformEmoji` `isFriend` `friendText` `ageVerified` `ageVerifiedText` `ageVerifiedEmoji` `ageStatus` |
+| Player | `name` `userId` (`playerId` is the old name) `platform` `platformEmoji` `isFriend` `friendText` `ageVerified` `ageVerifiedText` `ageVerifiedEmoji` `ageStatus` |
 | Avatar | `avatar` `avatarId` `avatarImageUrl` `pcRank` `pcRankText` `pcRankEmoji` `questRank` `questRankText` `questRankEmoji` |
 | Club | `preset` `inGroup` `inGroupText` `inGroupEmoji` |
 | History | `rejoin` `rejoinText` `rejoinEmoji` `rejoinAgo` `rejoinSince` `rejoinAt` |

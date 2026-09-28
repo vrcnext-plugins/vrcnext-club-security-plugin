@@ -9,7 +9,7 @@
  * - `failed` (red, ⛔): it was checked and does not hold.
  */
 
-import { rankIndex } from '@vrcnext/plugin-api';
+import { rankIndex, rankLabel } from '@vrcnext/plugin-api';
 
 import type { Facts } from './facts.js';
 import type { Preset } from './settings.js';
@@ -39,11 +39,6 @@ export const VERDICT_TEXT: Readonly<Record<Verdict, string>> = {
   failed: 'Requirements not met',
 };
 
-/** VRChat spells the worst rank `VeryPoor`; nobody says it that way. */
-export function rankText(rank: string): string {
-  return rank === '' ? 'Unknown' : rank.replace(/([a-z])([A-Z])/g, '$1 $2');
-}
-
 function ageCheck(facts: Facts): Check {
   const status = facts.ageVerificationStatus;
   const label = '18+ verified';
@@ -62,7 +57,7 @@ function rankCheck(key: 'pcRank' | 'questRank', label: string, rank: string, min
   if (have === undefined || want === undefined) {
     return { key, label, short: `${platform} unknown`, verdict: 'unverified', detail: 'rank unknown' };
   }
-  const short = `${platform} ${rankText(rank)}`;
+  const short = `${platform} ${rankLabel(rank)}`;
   return have <= want
     ? { key, label, short, verdict: 'met', detail: rank }
     : { key, label, short, verdict: 'failed', detail: `${rank}, needs ${minimum} or better` };

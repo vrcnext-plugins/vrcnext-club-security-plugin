@@ -19,6 +19,8 @@ const VERDICT_TONE: Readonly<Record<Verdict, UiBadgeTone>> = { met: 'ok', unveri
 export interface PanelDeps {
   readonly currentInstance: () => VrcInstance | undefined;
   readonly sendTest: () => Promise<void>;
+  /** Told when the tab comes on screen and when it leaves, so polling can follow the user. */
+  readonly onVisibility: (visible: boolean) => void;
 }
 
 export class ReportPanel {
@@ -38,6 +40,10 @@ export class ReportPanel {
       label: 'Club Security',
       icon: 'security',
       render: (tab) => { this.#render(tab); },
+      onVisibility: (visible) => {
+        if (visible) this.refresh();
+        this.#deps.onVisibility(visible);
+      },
     });
     // The host renders every schema setting on this card before `render` runs.
     this.#ctx.ui.addSettingsCard({

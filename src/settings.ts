@@ -51,13 +51,13 @@ export const DEFAULT_EMBED = {
 
 /** Names a template may use. Listed under the editors so the user can see them. */
 export const TEMPLATE_VARIABLES = [
-  'name', 'playerId', 'preset', 'event', 'eventText', 'result', 'resultText', 'resultEmoji', 'resultColor', 'checksText', 'checksPlainText',
+  'name', 'userId', 'preset', 'event', 'eventText', 'result', 'resultText', 'resultEmoji', 'resultColor', 'checksText', 'checksPlainText',
   'failedText', 'unverifiedText', 'ageVerified', 'ageVerifiedText', 'ageVerifiedEmoji', 'ageStatus',
   'pcRank', 'pcRankText', 'pcRankEmoji', 'questRank', 'questRankText', 'questRankEmoji',
   'avatar', 'avatarId', 'avatarImageUrl', 'avatarUrl', 'avatarLink', 'ranksText', 'requirementsText', 'logText',
   'trustScore', 'trustScoreText', 'trustScoreEmoji', 'trustText',
   'profileUrl', 'platform', 'platformEmoji', 'isFriend', 'friendText',
-  'inGroup', 'inGroupText', 'inGroupEmoji', 'rejoin', 'rejoinText', 'rejoinEmoji', 'rejoinAgo', 'rejoinSince',
+  'inGroup', 'inGroupText', 'inGroupEmoji', 'rejoin', 'rejoinText', 'rejoinEmoji', 'rejoinAgo', 'rejoinSince', 'rejoinAt',
   'world', 'worldId', 'worldUrl', 'instanceType', 'instanceTypeText', 'instanceId', 'instanceName',
   'location', 'time', 'date', 'timestamp',
 ] as const;
@@ -68,7 +68,7 @@ const RANK_OPTIONS = [
 ] as const;
 
 // The app's own names for the types, so a preset reads the way VRCNext's instance badges do.
-const INSTANCE_TYPE_OPTIONS = INSTANCE_TYPES.map((type) => ({ value: type, label: instanceTypeLabel(type) })) as unknown as readonly { readonly value: (typeof INSTANCE_TYPES)[number]; readonly label: string }[];
+const INSTANCE_TYPE_OPTIONS = INSTANCE_TYPES.map((type) => ({ value: type, label: instanceTypeLabel(type) }));
 
 /** One club. */
 export const preset = {
