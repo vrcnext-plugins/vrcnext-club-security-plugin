@@ -9,6 +9,13 @@ export default defineConfig([
   globalIgnores(['**/dist/**', '**/node_modules/**', 'vitest.config.ts']),
   eslint.configs.recommended,
   {
+    // The release signer runs under Node, never in the page; it needs Node's globals declared.
+    files: ['scripts/**/*.mjs'],
+    languageOptions: {
+      globals: { Buffer: 'readonly', process: 'readonly', URL: 'readonly', console: 'readonly' },
+    },
+  },
+  {
     files: ['**/*.ts'],
     extends: [tseslint.configs.strictTypeChecked, tseslint.configs.stylisticTypeChecked],
     languageOptions: {

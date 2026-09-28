@@ -138,3 +138,15 @@ npm install && npm run check
 `check` is type-check, lint and tests. The lint config mirrors the plugin host's own rules and
 the bridge's source policy, so anything it accepts installs. Nothing here is bundled but what
 `main.ts` imports — the tests stay out of the plugin.
+
+## Signature
+
+Every release of this plugin is signed; the bridge refuses to install or update it otherwise,
+and it stays pinned to this key. Check the fingerprint against the one VRCNext shows you when it
+asks whether to trust a new signing key:
+
+```
+1bc6-e13e-c44c-3bd0-f5a8-5618-8b9b-919c
+```
+
+If an update ever says the key changed, stop and ask before confirming.

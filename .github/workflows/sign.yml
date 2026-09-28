@@ -1,0 +1,39 @@
+name: Sign
+
+on:
+  push:
+    branches: [main]
+    paths-ignore: [plugin.sig]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: sign-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  sign:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Sign the tracked tree
+        env:
+          VRCNEXT_SIGNING_KEY: ${{ secrets.VRCNEXT_SIGNING_KEY }}
+        run: |
+          test -n "$VRCNEXT_SIGNING_KEY" || { echo "VRCNEXT_SIGNING_KEY is not set"; exit 1; }
+          node scripts/sign-plugin.mjs sign
+          node scripts/sign-plugin.mjs verify
+
+      - name: Commit plugin.sig if it changed
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git diff --quiet -- plugin.sig && { echo "signature unchanged"; exit 0; }
+          git add plugin.sig
+          git commit -m "Sign $(git rev-parse --short HEAD^{commit})"
+          git push
