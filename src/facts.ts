@@ -73,9 +73,45 @@ export interface CollectOptions {
   readonly signal: AbortSignal;
   /** Which groups matter; membership is only looked up when one is set. */
   readonly wantsGroups: boolean;
+  /** Told what each picture's address was and which one was used. */
+  readonly onImages?: (note: string) => void;
 }
 
-async function avatarFacts(vrchat: VrchatApi, joiner: Joiner, instance: VrcInstance | undefined, signal: AbortSignal): Promise<Pick<Facts, 'avatarId' | 'avatarName' | 'avatarImageUrl' | 'pcRank' | 'questRank'>> {
+/**
+ * Keeps a picture only if something other than this machine could load it, and says which.
+ *
+ * A report's pictures fail invisibly — Discord fetches them from its own servers, gets nothing
+ * from a `localhost` address, and renders a field with no image and no error — so the one
+ * useful thing to record is what the address actually was.
+ */
+function pickImage(
+  what: string,
+  candidates: readonly (readonly [string, string | undefined])[],
+  note: ((text: string) => void) | undefined,
+): string {
+  const seen: string[] = [];
+  for (const [source, url] of candidates) {
+    if (url === undefined || url === '') continue;
+    if (publicImageUrl(url) !== '') {
+      note?.(`${what}: using ${source} (${url})`);
+      return url;
+    }
+    seen.push(`${source}=${url}`);
+  }
+  note?.(seen.length === 0
+    ? `${what}: nothing to show; VRCNext gave no address`
+    : `${what}: dropped, only this machine could load ${seen.join(', ')}`);
+  return '';
+}
+
+interface AvatarLookup {
+  readonly instance: VrcInstance | undefined;
+  readonly signal: AbortSignal;
+  readonly note?: ((text: string) => void) | undefined;
+}
+
+async function avatarFacts(vrchat: VrchatApi, joiner: Joiner, lookup: AvatarLookup): Promise<Pick<Facts, 'avatarId' | 'avatarName' | 'avatarImageUrl' | 'pcRank' | 'questRank'>> {
+  const { instance, signal, note } = lookup;
   const known = instance?.users.find((u) => u.id === joiner.userId);
   let avatarId = known?.avatarId ?? '';
   let avatarName = known?.avatarName ?? '';
@@ -89,7 +125,10 @@ async function avatarFacts(vrchat: VrchatApi, joiner: Joiner, instance: VrcInsta
   return {
     avatarId,
     avatarName: avatar?.name ?? avatarName,
-    avatarImageUrl: publicImageUrl(avatar?.thumbnailImageUrl) || publicImageUrl(avatar?.imageUrl),
+    avatarImageUrl: pickImage('avatar thumbnail', [
+      ['avatar.thumbnailImageUrl', avatar?.thumbnailImageUrl],
+      ['avatar.imageUrl', avatar?.imageUrl],
+    ], note),
     pcRank: avatar?.pcRank ?? '',
     questRank: avatar?.questRank ?? '',
   };
@@ -106,7 +145,7 @@ export async function collectAvatarFacts(
   signal: AbortSignal,
 ): Promise<Facts> {
   if (joiner.userId === '') return UNKNOWN_FACTS;
-  const avatar = await avatarFacts(vrchat, joiner, instance, signal).catch(() => undefined);
+  const avatar = await avatarFacts(vrchat, joiner, { instance, signal }).catch(() => undefined);
   return { ...UNKNOWN_FACTS, ...(avatar ?? {}) };
 }
 
@@ -146,7 +185,7 @@ export async function collectFacts(
   const location = instance?.location ?? '';
   const [user, avatar, groups, timeline] = await Promise.all([
     vrchat.user(joiner.userId, { signal }),
-    avatarFacts(vrchat, joiner, instance, signal).catch(() => undefined),
+    avatarFacts(vrchat, joiner, { instance, signal, note: options.onImages }).catch(() => undefined),
     options.wantsGroups ? vrchat.userGroups(joiner.userId, { signal }).then((g) => g.map((x) => x.id), () => undefined) : Promise.resolve(undefined),
     vrchat.userTimeline(joiner.userId, { signal }).catch(() => undefined),
   ]);
@@ -160,7 +199,11 @@ export async function collectFacts(
     // VRCNext's own `imageUrl` is its image cache on this machine, which nothing outside the app
     // can load; VRChat serves `currentAvatarImageUrl` itself, so that is the profile picture a
     // report can actually show. Either way the value is checked rather than trusted.
-    userImageUrl: publicImageUrl(user?.currentAvatarImageUrl) || publicImageUrl(user?.imageUrl) || publicImageUrl(inInstance?.imageUrl),
+    userImageUrl: pickImage('profile picture', [
+      ['user.currentAvatarImageUrl', user?.currentAvatarImageUrl],
+      ['user.imageUrl', user?.imageUrl],
+      ['instanceUser.imageUrl', inInstance?.imageUrl],
+    ], options.onImages),
     ...(avatar ?? { avatarId: '', avatarName: '', avatarImageUrl: '', pcRank: '', questRank: '' }),
     groupIds: groups,
     rejoin: location === '' ? UNKNOWN_REJOIN : rejoinIn(timeline, location),

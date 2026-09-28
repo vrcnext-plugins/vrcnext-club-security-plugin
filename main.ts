@@ -235,6 +235,7 @@ class ClubSecurity {
   /** One fact collection, then one report per preset. */
   async #report(joiner: Joiner, instance: VrcInstance, presets: readonly Preset[], deadlineMs: number): Promise<void> {
     const facts = await collectFacts(this.#ctx.vrchat, joiner, instance, {
+      onImages: (note) => { this.#ctx.logger.debug(note); },
       deadlineMs,
       signal: this.#ctx.signal,
       wantsGroups: presets.some((p) => p.requiredGroup !== ''),
@@ -277,6 +278,7 @@ class ClubSecurity {
     const { joiner, instance } = replay;
     if (!replay.located) this.#ctx.logger.warn(`Where ${joiner.name} was last seen is not recorded; the report uses a stand-in instance.`);
     const facts = await collectFacts(this.#ctx.vrchat, joiner, instance, {
+      onImages: (note) => { this.#ctx.logger.debug(note); },
       deadlineMs: this.#ctx.settings.get('collectTimeoutSecs') * 1000,
       signal: this.#ctx.signal,
       wantsGroups: presets.some((p) => p.requiredGroup !== ''),
