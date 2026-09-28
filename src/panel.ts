@@ -91,7 +91,7 @@ export class ReportPanel {
           k.button({
             label: 'Test self',
             icon: 'person_check',
-            title: 'Runs your own account through every enabled preset, ignoring the rules that normally keep you out of reports. Shown here only — nothing is sent. Uses your current instance, or the last one VRCNext recorded you in, or a stand-in when it has neither.',
+            title: 'Runs your own account through every enabled preset, ignoring the rules that normally keep you out of reports, and sends the reports to their channels — so a silent webhook or a missing desktop notification shows up here. Uses your current instance, or the last one VRCNext recorded you in, or a stand-in when it has neither.',
             onClick: () => { void this.#deps.testSelf(); },
           }),
           this.#roomButton = k.button({
@@ -104,7 +104,7 @@ export class ReportPanel {
           k.button({
             label: 'Replay last join',
             icon: 'send',
-            title: 'Replays the last player VRCNext recorded through every enabled preset and sends the reports to their channels — the one button that exercises Discord, desktop and VR. Works with VRChat closed.',
+            title: 'Replays the last player VRCNext recorded through every enabled preset and sends the reports to their channels. Works with VRChat closed.',
             onClick: () => { void this.#deps.sendTest(); },
           }),
         ),

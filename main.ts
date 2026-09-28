@@ -294,7 +294,12 @@ class ClubSecurity {
    *
    * `#isSelf` and the whitelist exist so a moderator's own arrivals stay out of the channel,
    * which also means there is no way to find out how a preset's rules treat you. This is that
-   * way. It never reaches the channels: the answer belongs on screen.
+   * way.
+   *
+   * It delivers to the channels like any other report, because "how would I be treated" includes
+   * the notification: a desktop toast that never arrives and a webhook that stays silent are
+   * exactly the failures this button is worth pressing to find. It is one player on one click,
+   * so it cannot run away with the club's Discord the way the room check could.
    */
   async #testSelf(): Promise<void> {
     const presets = this.#testablePresets();
@@ -304,9 +309,9 @@ class ClubSecurity {
       this.#ctx.notifications.toast({ message: 'Not signed in to VRChat yet, so there is no account to check.', ok: false });
       return;
     }
-    await this.#runTest(replay, presets, false);
+    await this.#runTest(replay, presets, true);
     this.#ctx.notifications.toast({
-      message: `Checked yourself against ${String(presets.length)} preset(s); shown here only.`,
+      message: `Checked yourself against ${String(presets.length)} preset(s); reports were sent.`,
     });
   }
 
