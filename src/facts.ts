@@ -7,7 +7,7 @@
  * parallel and each one degrades to "unknown" on its own rather than holding up the report.
  */
 
-import { parseLocation, publicImageUrl, recentUserEvents, trustScore, type PerformanceRank, type TrustScore, type VrcInstance, type VrcTimelineEvent, type VrchatApi } from '@vrcnext/plugin-api';
+import { parseLocation, publicImageUrl, recentUserEvents, trustScore, type ImageSubject, type PerformanceRank, type TrustScore, type VrcInstance, type VrcTimelineEvent, type VrchatApi } from '@vrcnext/plugin-api';
 
 import { rejoinIn, UNKNOWN_REJOIN, type Rejoin } from './history.js';
 
@@ -83,12 +83,19 @@ export interface CollectOptions {
  * A report's pictures fail invisibly — Discord fetches them from its own servers, gets nothing
  * from a `localhost` address, and renders a field with no image and no error — so the one
  * useful thing to record is what the address actually was.
+ *
+ * Whatever the lookups already handed over comes first: for a picture VRCNext has not cached yet
+ * that is VRChat's own address, and using it costs nothing. Only when every candidate turns out to
+ * be VRCNext's local cache is `subject` resolved through {@link VrchatApi.originalImageUrl}, which
+ * reads the address VRCNext recorded when it downloaded the file. Neither path asks VRChat for
+ * anything; the fallback is one indexed lookup in a database on this machine.
  */
-function pickImage(
+async function pickImage(
   what: string,
   candidates: readonly (readonly [string, string | undefined])[],
+  fallback: { readonly vrchat: VrchatApi; readonly subject: ImageSubject; readonly signal: AbortSignal },
   note: ((text: string) => void) | undefined,
-): string {
+): Promise<string> {
   const seen: string[] = [];
   for (const [source, url] of candidates) {
     if (url === undefined || url === '') continue;
@@ -98,9 +105,20 @@ function pickImage(
     }
     seen.push(`${source}=${url}`);
   }
-  note?.(seen.length === 0
-    ? `${what}: nothing to show; VRCNext gave no address`
-    : `${what}: dropped, only this machine could load ${seen.join(', ')}`);
+  if (seen.length === 0) {
+    note?.(`${what}: nothing to show; VRCNext gave no address`);
+    return '';
+  }
+  // Checked here as well as in the host: this is the value that goes into the embed, and a local
+  // address reaching Discord is the silent failure this whole function exists to prevent.
+  const stored = publicImageUrl(
+    await fallback.vrchat.originalImageUrl(fallback.subject, { signal: fallback.signal }),
+  );
+  if (stored !== '') {
+    note?.(`${what}: ${seen.join(', ')} is this machine only; using the address VRCNext recorded (${stored})`);
+    return stored;
+  }
+  note?.(`${what}: dropped, only this machine could load ${seen.join(', ')}, and VRCNext recorded no other address`);
   return '';
 }
 
@@ -125,10 +143,10 @@ async function avatarFacts(vrchat: VrchatApi, joiner: Joiner, lookup: AvatarLook
   return {
     avatarId,
     avatarName: avatar?.name ?? avatarName,
-    avatarImageUrl: pickImage('avatar thumbnail', [
+    avatarImageUrl: await pickImage('avatar thumbnail', [
       ['avatar.thumbnailImageUrl', avatar?.thumbnailImageUrl],
       ['avatar.imageUrl', avatar?.imageUrl],
-    ], note),
+    ], { vrchat, subject: { kind: 'avatar', id: avatarId }, signal }, note),
     pcRank: avatar?.pcRank ?? '',
     questRank: avatar?.questRank ?? '',
   };
@@ -199,11 +217,11 @@ export async function collectFacts(
     // VRCNext's own `imageUrl` is its image cache on this machine, which nothing outside the app
     // can load; VRChat serves `currentAvatarImageUrl` itself, so that is the profile picture a
     // report can actually show. Either way the value is checked rather than trusted.
-    userImageUrl: pickImage('profile picture', [
+    userImageUrl: await pickImage('profile picture', [
       ['user.currentAvatarImageUrl', user?.currentAvatarImageUrl],
       ['user.imageUrl', user?.imageUrl],
       ['instanceUser.imageUrl', inInstance?.imageUrl],
-    ], options.onImages),
+    ], { vrchat, subject: { kind: 'user', id: joiner.userId }, signal: options.signal }, options.onImages),
     ...(avatar ?? { avatarId: '', avatarName: '', avatarImageUrl: '', pcRank: '', questRank: '' }),
     groupIds: groups,
     rejoin: location === '' ? UNKNOWN_REJOIN : rejoinIn(timeline, location),
