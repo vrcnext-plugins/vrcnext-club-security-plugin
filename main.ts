@@ -175,7 +175,11 @@ class ClubSecurity {
     const presets = this.#presetsFor(joiner, instance).filter((p) => p.watchAvatarChanges);
     if (presets.length === 0) return;
     try {
-      const facts = await collectAvatarFacts(this.#ctx.vrchat, joiner, instance, this.#ctx.signal);
+      const facts = await collectAvatarFacts(this.#ctx.vrchat, joiner, instance, {
+        signal: this.#ctx.signal,
+        onImages: (note) => { this.#ctx.logger.debug(note); },
+        extraApiRequests: this.#ctx.settings.get('allowExtraApiRequests'),
+      });
       for (const preset of presets) {
         const evaluation = evaluate(preset, facts, { only: AVATAR_CHECKS });
         if (evaluation.checks.length === 0) continue;
@@ -236,6 +240,7 @@ class ClubSecurity {
   async #report(joiner: Joiner, instance: VrcInstance, presets: readonly Preset[], deadlineMs: number): Promise<void> {
     const facts = await collectFacts(this.#ctx.vrchat, joiner, instance, {
       onImages: (note) => { this.#ctx.logger.debug(note); },
+      extraApiRequests: this.#ctx.settings.get('allowExtraApiRequests'),
       deadlineMs,
       signal: this.#ctx.signal,
       wantsGroups: presets.some((p) => p.requiredGroup !== ''),
@@ -279,6 +284,7 @@ class ClubSecurity {
     if (!replay.located) this.#ctx.logger.warn(`Where ${joiner.name} was last seen is not recorded; the report uses a stand-in instance.`);
     const facts = await collectFacts(this.#ctx.vrchat, joiner, instance, {
       onImages: (note) => { this.#ctx.logger.debug(note); },
+      extraApiRequests: this.#ctx.settings.get('allowExtraApiRequests'),
       deadlineMs: this.#ctx.settings.get('collectTimeoutSecs') * 1000,
       signal: this.#ctx.signal,
       wantsGroups: presets.some((p) => p.requiredGroup !== ''),

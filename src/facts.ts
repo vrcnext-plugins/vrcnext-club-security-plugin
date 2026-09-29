@@ -73,6 +73,11 @@ export interface CollectOptions {
   readonly signal: AbortSignal;
   /** Which groups matter; membership is only looked up when one is set. */
   readonly wantsGroups: boolean;
+  /**
+   * Whether a picture neither the lookups nor VRCNext's records could supply may cost one more
+   * uncached lookup. The club's `allowExtraApiRequests` answer; nothing else spends a request.
+   */
+  readonly extraApiRequests?: boolean;
   /** Told what each picture's address was and which one was used. */
   readonly onImages?: (note: string) => void;
 }
@@ -84,26 +89,47 @@ export interface CollectOptions {
  * from a `localhost` address, and renders a field with no image and no error — so the one
  * useful thing to record is what the address actually was.
  *
- * Whatever the lookups already handed over comes first: for a picture VRCNext has not cached yet
- * that is VRChat's own address, and using it costs nothing. Only when every candidate turns out to
- * be VRCNext's local cache is `subject` resolved through {@link VrchatApi.originalImageUrl}, which
- * reads the address VRCNext recorded when it downloaded the file. Neither path asks VRChat for
- * anything; the fallback is one indexed lookup in a database on this machine.
+ * Three places are asked, cheapest first, and the note says which one answered:
+ *
+ * 1. **What the lookups already handed over.** For a picture VRCNext has not cached yet that is
+ *    VRChat's own address, and using it costs nothing.
+ * 2. **The address VRCNext recorded** when it downloaded the file, through
+ *    {@link VrchatApi.originalImageUrl} — one indexed lookup in a database on this machine.
+ * 3. **One uncached lookup**, and only when the club opted in with `allowExtraApiRequests`. This is
+ *    the only step that may make VRCNext ask VRChat again, which is why it is off by default and
+ *    last: it is worth a request only once the two free answers have both come up empty.
  */
+type Candidates = readonly (readonly [string, string | undefined])[];
+
+interface ImageFallback {
+  readonly vrchat: VrchatApi;
+  readonly subject: ImageSubject;
+  readonly signal: AbortSignal;
+  /** Opt-in only; absent means the club did not allow the extra request. */
+  readonly refetch?: (() => Promise<Candidates>) | undefined;
+}
+
+/** The first candidate something other than this machine could load, and what the rest were. */
+function firstPublic(candidates: Candidates, seen: string[]): readonly [string, string] | undefined {
+  for (const [source, url] of candidates) {
+    if (url === undefined || url === '') continue;
+    if (publicImageUrl(url) !== '') return [source, url];
+    seen.push(`${source}=${url}`);
+  }
+  return undefined;
+}
+
 async function pickImage(
   what: string,
-  candidates: readonly (readonly [string, string | undefined])[],
-  fallback: { readonly vrchat: VrchatApi; readonly subject: ImageSubject; readonly signal: AbortSignal },
+  candidates: Candidates,
+  fallback: ImageFallback,
   note: ((text: string) => void) | undefined,
 ): Promise<string> {
   const seen: string[] = [];
-  for (const [source, url] of candidates) {
-    if (url === undefined || url === '') continue;
-    if (publicImageUrl(url) !== '') {
-      note?.(`${what}: using ${source} (${url})`);
-      return url;
-    }
-    seen.push(`${source}=${url}`);
+  const found = firstPublic(candidates, seen);
+  if (found !== undefined) {
+    note?.(`${what}: using ${found[0]} (${found[1]})`);
+    return found[1];
   }
   if (seen.length === 0) {
     note?.(`${what}: nothing to show; VRCNext gave no address`);
@@ -118,7 +144,18 @@ async function pickImage(
     note?.(`${what}: ${seen.join(', ')} is this machine only; using the address VRCNext recorded (${stored})`);
     return stored;
   }
-  note?.(`${what}: dropped, only this machine could load ${seen.join(', ')}, and VRCNext recorded no other address`);
+  if (fallback.refetch !== undefined) {
+    const fresh = await fallback.refetch().catch(() => []);
+    const again = firstPublic(fresh, seen);
+    if (again !== undefined) {
+      note?.(`${what}: nothing local could be shown, so it was looked up again; using ${again[0]} (${again[1]})`);
+      return again[1];
+    }
+    note?.(`${what}: dropped, and looking it up again did not help (${seen.join(', ')})`);
+    return '';
+  }
+  note?.(`${what}: dropped, only this machine could load ${seen.join(', ')}, and VRCNext recorded no other address`
+    + '; turn on "Allow making extra API requests" to let it look again');
   return '';
 }
 
@@ -126,6 +163,7 @@ interface AvatarLookup {
   readonly instance: VrcInstance | undefined;
   readonly signal: AbortSignal;
   readonly note?: ((text: string) => void) | undefined;
+  readonly extraApiRequests?: boolean | undefined;
 }
 
 async function avatarFacts(vrchat: VrchatApi, joiner: Joiner, lookup: AvatarLookup): Promise<Pick<Facts, 'avatarId' | 'avatarName' | 'avatarImageUrl' | 'pcRank' | 'questRank'>> {
@@ -146,7 +184,18 @@ async function avatarFacts(vrchat: VrchatApi, joiner: Joiner, lookup: AvatarLook
     avatarImageUrl: await pickImage('avatar thumbnail', [
       ['avatar.thumbnailImageUrl', avatar?.thumbnailImageUrl],
       ['avatar.imageUrl', avatar?.imageUrl],
-    ], { vrchat, subject: { kind: 'avatar', id: avatarId }, signal }, note),
+    ], {
+      vrchat,
+      subject: { kind: 'avatar', id: avatarId },
+      signal,
+      refetch: lookup.extraApiRequests !== true ? undefined : async () => {
+        const fresh = await vrchat.avatar(avatarId, { signal, cached: false });
+        return [
+          ['refetched avatar.thumbnailImageUrl', fresh?.thumbnailImageUrl],
+          ['refetched avatar.imageUrl', fresh?.imageUrl],
+        ];
+      },
+    }, note),
     pcRank: avatar?.pcRank ?? '',
     questRank: avatar?.questRank ?? '',
   };
@@ -160,10 +209,15 @@ export async function collectAvatarFacts(
   vrchat: VrchatApi,
   joiner: Joiner,
   instance: VrcInstance | undefined,
-  signal: AbortSignal,
+  options: Pick<CollectOptions, 'signal' | 'onImages' | 'extraApiRequests'>,
 ): Promise<Facts> {
   if (joiner.userId === '') return UNKNOWN_FACTS;
-  const avatar = await avatarFacts(vrchat, joiner, { instance, signal }).catch(() => undefined);
+  const avatar = await avatarFacts(vrchat, joiner, {
+    instance,
+    signal: options.signal,
+    note: options.onImages,
+    extraApiRequests: options.extraApiRequests,
+  }).catch(() => undefined);
   return { ...UNKNOWN_FACTS, ...(avatar ?? {}) };
 }
 
@@ -203,7 +257,7 @@ export async function collectFacts(
   const location = instance?.location ?? '';
   const [user, avatar, groups, timeline] = await Promise.all([
     vrchat.user(joiner.userId, { signal }),
-    avatarFacts(vrchat, joiner, { instance, signal, note: options.onImages }).catch(() => undefined),
+    avatarFacts(vrchat, joiner, { instance, signal, note: options.onImages, extraApiRequests: options.extraApiRequests }).catch(() => undefined),
     options.wantsGroups ? vrchat.userGroups(joiner.userId, { signal }).then((g) => g.map((x) => x.id), () => undefined) : Promise.resolve(undefined),
     vrchat.userTimeline(joiner.userId, { signal }).catch(() => undefined),
   ]);
@@ -221,7 +275,18 @@ export async function collectFacts(
       ['user.currentAvatarImageUrl', user?.currentAvatarImageUrl],
       ['user.imageUrl', user?.imageUrl],
       ['instanceUser.imageUrl', inInstance?.imageUrl],
-    ], { vrchat, subject: { kind: 'user', id: joiner.userId }, signal: options.signal }, options.onImages),
+    ], {
+      vrchat,
+      subject: { kind: 'user', id: joiner.userId },
+      signal: options.signal,
+      refetch: options.extraApiRequests !== true ? undefined : async () => {
+        const fresh = await vrchat.user(joiner.userId, { signal: options.signal, cached: false });
+        return [
+          ['refetched user.currentAvatarImageUrl', fresh?.currentAvatarImageUrl],
+          ['refetched user.imageUrl', fresh?.imageUrl],
+        ];
+      },
+    }, options.onImages),
     ...(avatar ?? { avatarId: '', avatarName: '', avatarImageUrl: '', pcRank: '', questRank: '' }),
     groupIds: groups,
     rejoin: location === '' ? UNKNOWN_REJOIN : rejoinIn(timeline, location),

@@ -66,7 +66,7 @@ test('verdict variables follow the worst check', () => {
 test('the default embed renders with the verdict colour and the avatar thumbnail', () => {
   const embed = renderEmbed(completeEmbed(DEFAULT_EMBED), reportValues(report()), { at: new Date(0) });
   assert.ok(embed !== undefined);
-  assert.equal(embed.title, 'Tupper joined');
+  assert.equal(embed.title, '"Tupper" joined', 'quoted, so a display name cannot read as part of the sentence');
   assert.equal(embed.url, undefined, 'the title does not navigate; the author line carries the profile');
   assert.deepEqual(embed.author, {
     name: 'usr_1',
@@ -170,11 +170,33 @@ function text(values: Record<string, unknown>, key: string): string {
 test('a requirement that measured something says the measurement, passed or not', () => {
   const scored = { percent: 97, criteria: [], description: 'Trusted.' };
   const met = reportValues(report({ minTrustScore: 75 }, { trust: scored }));
-  assert.match(text(met, 'requirementsText'), /Trust score 75%\+: ✅ \*\*97%\*\*/);
+  assert.match(text(met, 'requirementsText'), /Trust score: ✅ \*\*97%\*\*/);
 
   const under = reportValues(report({ minTrustScore: 98 }, { trust: scored }));
-  assert.match(text(under, 'requirementsText'), /Trust score 98%\+: ⛔ \*\*97%, needs 98%\*\*/);
+  assert.match(text(under, 'requirementsText'), /Trust score: ⛔ \*\*97%, needs 98%\*\*/);
 
   // A requirement with nothing to measure still says only whether it holds.
   assert.match(text(met, 'requirementsText'), /18\+ verified: ✅(\n|$)/);
+});
+
+test('a template can name what the preset asked for, not only what the joiner was', () => {
+  const values = reportValues(report({ minTrustScore: 75, minQuestRank: 'Good', requireFriend: true }));
+  assert.equal(values['presetRequiredTrustScore'], '75%');
+  assert.equal(values['presetRequiredPcRank'], 'Medium');
+  assert.equal(values['presetRequiredQuestRank'], 'Good');
+  assert.equal(values['presetRequiredGroup'], 'grp_a');
+  assert.equal(values['presetRequiredAge'], '18+');
+  assert.equal(values['presetRequiredFriend'], 'Friend');
+});
+
+test('a requirement the preset does not check has no value, so a line naming it is dropped', () => {
+  const values = reportValues(report({
+    minTrustScore: 0, minPcRank: 'any', minQuestRank: 'any', requiredGroup: '', requireAge: false, requireFriend: false,
+  }));
+  for (const key of [
+    'presetRequiredTrustScore', 'presetRequiredPcRank', 'presetRequiredQuestRank',
+    'presetRequiredGroup', 'presetRequiredAge', 'presetRequiredFriend',
+  ]) {
+    assert.equal(values[key], undefined, `${key} should be absent, not "any"`);
+  }
 });

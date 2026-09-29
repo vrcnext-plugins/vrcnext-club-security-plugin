@@ -57,7 +57,7 @@ function vrchatUrl(kind: 'user' | 'avatar' | 'world' | 'group', id: string): str
 
 /**
  * The checks as Discord lines: `18+ verified: ✅`, `PC avatar rank: ⛔ **Very Poor**`,
- * `Trust score 75%+: ✅ **97%**`.
+ * `Trust score: ✅ **97%**`.
  *
  * A check that passed usually needs no words — the tick says it. One that did not is the reason
  * the report was worth reading, so its detail is bold. A check that measured something says the
@@ -110,6 +110,16 @@ export function reportValues(report: Report): TemplateValues {
     eventText: kind === 'avatar' ? 'switched avatar' : facts.rejoin.seenHere === true ? 'rejoined' : 'joined',
     userId: joiner.userId,
     preset: preset.name,
+    // What the preset asked for, as opposed to what the joiner turned out to be. A requirement the
+    // preset does not check is `undefined` rather than "any", so a template line naming one is
+    // dropped instead of printing a floor nobody set.
+    presetRequiredAge: preset.requireAge ? '18+' : undefined,
+    presetRequiredFriend: preset.requireFriend ? 'Friend' : undefined,
+    presetRequiredPcRank: preset.minPcRank === 'any' ? undefined : rankLabel(preset.minPcRank),
+    presetRequiredQuestRank: preset.minQuestRank === 'any' ? undefined : rankLabel(preset.minQuestRank),
+    presetRequiredGroup: preset.requiredGroup === '' ? undefined : preset.requiredGroup,
+    // Zero is "any", the same bargain `evaluate` makes when it leaves the check out entirely.
+    presetRequiredTrustScore: preset.minTrustScore > 0 ? `${String(preset.minTrustScore)}%` : undefined,
     result: evaluation.verdict,
     resultText: VERDICT_TEXT[evaluation.verdict],
     resultEmoji: VERDICT_EMOJI[evaluation.verdict],

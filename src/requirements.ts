@@ -91,7 +91,10 @@ function groupCheck(facts: Facts, groupId: string): Check {
  * VRCNext not answering is not the joiner's doing.
  */
 function trustCheck(facts: Facts, minimum: number): Check {
-  const label = `Trust score ${String(minimum)}%+`;
+  // Named like every other check, without the floor: the lines read as a column that way, and the
+  // floor is only news when it is missed, where `detail` already says "needs 98%". A template that
+  // does want it has `{presetRequiredTrustScore}`.
+  const label = 'Trust score';
   if (facts.trust === undefined) {
     return { key: 'trust', label, short: 'Trust unknown', verdict: 'unverified', detail: 'profile unreadable' };
   }

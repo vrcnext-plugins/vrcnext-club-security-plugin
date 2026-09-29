@@ -96,6 +96,7 @@ the field red rather than rendering as nothing an hour later.
 | Avatar | `avatar` `avatarId` `avatarImageUrl` `avatarLink` `avatarPlain` `ranksText` `pcRank` `pcRankText` `pcRankEmoji` `questRank` `questRankText` `questRankEmoji` |
 | Activity | `logText` — the player's recent records as Discord lines |
 | Club | `preset` `inGroup` `inGroupText` `inGroupEmoji` |
+| What the preset asked for | `presetRequiredAge` `presetRequiredFriend` `presetRequiredPcRank` `presetRequiredQuestRank` `presetRequiredGroup` `presetRequiredTrustScore` — the floors this preset set, as opposed to what the joiner turned out to be. A requirement it does not check has no value, so a line naming one is dropped rather than printing "any" |
 | History | `rejoin` `rejoinText` `rejoinEmoji` `rejoinAgo` `rejoinSince` `rejoinAt` |
 | Place and time | `world` `worldId` `instanceType` `instanceId` `location` `time` `date` `timestamp` |
 
@@ -122,6 +123,24 @@ Everything goes through `ctx.vrchat`, which reads VRCNext's data **without openi
 
 Each lookup runs in parallel and degrades to "unknown" on its own timeout rather than holding up
 the report.
+
+### Pictures
+
+Discord fetches an embed's images from its own servers, and VRCNext serves pictures it has
+downloaded from its cache on this machine — a `http://localhost:…/imgcache/…` address that is
+nothing anywhere else. So each picture is looked for in up to three places, cheapest first, and
+the debug log says which one answered:
+
+1. **What the lookup already handed over.** For a picture VRCNext has not cached yet, that is
+   VRChat's own address, and using it costs nothing.
+2. **The address VRCNext recorded** when it downloaded the file — one indexed read of VRCNext's
+   own database, on this machine.
+3. **One more uncached lookup**, only with **Allow making extra API requests** on. This is the
+   only step that may make VRCNext ask VRChat again, which is why it is off by default: VRChat
+   rate-limits, and a busy club is a lot of joins.
+
+With the switch off, a picture none of the free answers could supply is simply left out — better
+an empty thumbnail than one only your own machine can load.
 
 ## Your own joins
 

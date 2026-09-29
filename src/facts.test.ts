@@ -25,18 +25,35 @@ interface Fake {
   readonly avatarImage?: string;
   /** What VRCNext recorded when it downloaded the picture, by cache key. */
   readonly stored?: Readonly<Record<string, string>>;
+  /** What an uncached lookup would answer, for the opt-in extra request. */
+  readonly refetchedProfile?: string;
+  readonly refetchedAvatarThumb?: string;
 }
 
 /** Cache keys `originalImageUrl` was asked for, in order, so the ordering can be asserted. */
 let asked: string[] = [];
+/** Lookups made with `cached: false`, which are the ones that may cost a VRChat request. */
+let uncached: string[] = [];
+
+/**
+ * What an uncached lookup answers, and a record that it was made.
+ *
+ * `undefined` means "nothing different": a refetch that changes nothing is a real outcome, and the
+ * one worth asserting is that the request happened at all.
+ */
+function fresh(options: { cached?: boolean } | undefined, what: string, answer: string | undefined): string | undefined {
+  if (options?.cached !== false) return undefined;
+  uncached.push(what);
+  return answer;
+}
 
 function vrchat(fake: Fake): VrchatApi {
   return {
-    user: () => Promise.resolve({
+    user: (_id: string, options?: { cached?: boolean }) => Promise.resolve({
       id: 'usr_1',
       displayName: 'Joiner',
       imageUrl: fake.imageUrl ?? '',
-      currentAvatarImageUrl: fake.currentAvatarImageUrl ?? '',
+      currentAvatarImageUrl: fresh(options, 'user', fake.refetchedProfile) ?? fake.currentAvatarImageUrl ?? '',
       tags: [],
       groups: [],
       dateJoined: '2021-01-01',
@@ -46,10 +63,10 @@ function vrchat(fake: Fake): VrchatApi {
       isFriend: false,
       platform: 'standalonewindows',
     }),
-    avatar: () => Promise.resolve({
+    avatar: (_id: string, options?: { cached?: boolean }) => Promise.resolve({
       id: 'avtr_1',
       name: 'Ava',
-      thumbnailImageUrl: fake.avatarThumb ?? '',
+      thumbnailImageUrl: fresh(options, 'avatar', fake.refetchedAvatarThumb) ?? fake.avatarThumb ?? '',
       imageUrl: fake.avatarImage ?? '',
       pcRank: 'Good',
       questRank: 'Poor',
@@ -66,12 +83,14 @@ function vrchat(fake: Fake): VrchatApi {
   } as unknown as VrchatApi;
 }
 
-function collect(fake: Fake): Promise<{ userImageUrl: string; avatarImageUrl: string }> {
+function collect(fake: Fake, extraApiRequests = false): Promise<{ userImageUrl: string; avatarImageUrl: string }> {
   asked = [];
+  uncached = [];
   return collectFacts(vrchat(fake), { name: 'Joiner', userId: 'usr_1' }, undefined, {
     deadlineMs: 1000,
     signal: new AbortController().signal,
     wantsGroups: false,
+    extraApiRequests,
   });
 }
 
@@ -131,5 +150,45 @@ test('no address anywhere drops the field, and says both halves failed', async (
   assert.ok(
     notes.some((n) => n.includes('VRCNext recorded no other address')),
     `the log should say the fallback was tried too: ${notes.join(' | ')}`,
+  );
+});
+
+test('nothing local to show costs no request unless the club allowed one', async () => {
+  const facts = await collect({ imageUrl: CACHED, avatarThumb: CACHED, refetchedProfile: PROFILE });
+  assert.equal(facts.userImageUrl, '', 'the opt-in is off, so the picture is dropped');
+  assert.deepEqual(uncached, [], 'a club that did not ask for extra requests never pays for one');
+});
+
+test('with the opt-in on, a picture neither free answer could supply is looked up again', async () => {
+  const facts = await collect(
+    { imageUrl: CACHED, avatarThumb: CACHED, refetchedProfile: PROFILE, refetchedAvatarThumb: AVATAR_THUMB },
+    true,
+  );
+  assert.equal(facts.userImageUrl, PROFILE);
+  assert.equal(facts.avatarImageUrl, AVATAR_THUMB);
+  assert.deepEqual([...uncached].sort(), ['avatar', 'user']);
+});
+
+test('the extra request is last, so a picture the database knows never triggers one', async () => {
+  const stored = 'https://api.vrchat.cloud/api/1/image/file_stored/1/800';
+  const facts = await collect(
+    { imageUrl: CACHED, avatarThumb: CACHED, stored: { 'user:usr_1': stored, 'avatar:avtr_1': stored } },
+    true,
+  );
+  assert.equal(facts.userImageUrl, stored);
+  assert.deepEqual(uncached, [], 'an indexed read on this machine beats asking VRChat again');
+});
+
+test('the note tells a club the opt-in exists, rather than only that it failed', async () => {
+  const notes: string[] = [];
+  await collectFacts(vrchat({ imageUrl: CACHED }), { name: 'Joiner', userId: 'usr_1' }, undefined, {
+    deadlineMs: 1000,
+    signal: new AbortController().signal,
+    wantsGroups: false,
+    onImages: (note) => { notes.push(note); },
+  });
+  assert.ok(
+    notes.some((n) => n.includes('Allow making extra API requests')),
+    `the log should name the switch that would help: ${notes.join(' | ')}`,
   );
 });

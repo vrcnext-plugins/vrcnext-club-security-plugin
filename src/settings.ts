@@ -37,7 +37,9 @@ export const DEFAULT_EMBED = {
   // The title is not a link: the profile belongs on the author line, where Discord puts the
   // person an embed is about, and a title that navigates somewhere is a surprise in a report
   // whose subject is already named twice.
-  title: '{name} {eventText}',
+  // Quoted, because a display name is arbitrary text: `Bluscream joined` reads as a sentence,
+  // while `now joined` or `🎧 DJ joined` does not, and the quotes make the boundary obvious.
+  title: '"{name}" {eventText}',
   authorName: '{userId}',
   authorUrl: '{profileUrl}',
   authorIconUrl: '{userImageUrl}',
@@ -66,6 +68,12 @@ export const TEMPLATE_VARIABLES = {
   profileUrl: 'Link to their VRChat profile',
   userImageUrl: 'Their profile picture',
   preset: 'Name of the preset that produced this report',
+  presetRequiredAge: '"18+" when this preset requires age verification',
+  presetRequiredFriend: '"Friend" when this preset requires friendship',
+  presetRequiredPcRank: 'The PC rank floor this preset asks for, in words',
+  presetRequiredQuestRank: 'The Quest rank floor this preset asks for, in words',
+  presetRequiredGroup: 'The group this preset requires membership of',
+  presetRequiredTrustScore: 'The trust score floor this preset asks for, e.g. 75%',
   event: 'join or avatar',
   eventText: '"joined" or "switched avatar"',
   result: 'met, unverified or failed',
@@ -342,6 +350,15 @@ export const settings = {
     markers: [1, 5, 10, 15, 25, 40, 60],
     integer: true,
     unit: 's',
+  },
+  allowExtraApiRequests: {
+    kind: 'boolean',
+    label: 'Allow making extra API requests',
+    description:
+      'Off, a report only uses what VRCNext already fetched plus what it recorded on this machine. '
+      + 'On, a picture that neither of those can supply is worth one more uncached lookup, which may '
+      + 'make VRCNext ask VRChat again. Off by default: VRChat rate-limits, and a busy club is a lot of joins.',
+    default: false,
   },
   notifyTimeoutSecs: {
     kind: 'number',
