@@ -40,7 +40,7 @@ export function eventCount(
   seenLocations?: readonly string[],
 ): number | undefined {
   // Every instance in the database when the club granted `sql`, and the ten-record timeline
-  // window when it did not — see the ceiling described above.
+  // ten-record slice when it did not — see the ceiling described above.
   const places = seenLocations !== undefined
     ? seenLocations.map((location) => parseLocation(location)).filter((place) => place.key !== '')
     : events === undefined ? undefined : instancesSeen(events);

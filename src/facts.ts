@@ -377,7 +377,7 @@ async function seenLocationsFor(sql: SqlApi | undefined, userId: string): Promis
  * The oldest record VRCNext holds about this player — usually the day you met.
  *
  * reuse: the pinned last line of the activity log is meant to be the first thing VRCNext ever
- * saw of them, and a ten-record window cannot reach it for anyone you have met more than ten
+ * saw of them, and ten records cannot reach it for anyone you have met more than ten
  * events ago. One row, ordered in SQLite rather than in the page.
  */
 async function oldestEventFor(sql: SqlApi | undefined, userId: string): Promise<VrcTimelineEvent | undefined> {

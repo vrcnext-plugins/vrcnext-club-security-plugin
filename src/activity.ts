@@ -45,7 +45,7 @@ export const LOG_LINES = 12;
  *
  * `userEventLines({ oldest: true })` pins the oldest row it is given, and what it is given is the
  * ten records a timeline read returns. Appending the database's own oldest makes that pin the
- * first thing VRCNext ever saw. Skipped when the window already reaches it.
+ * first thing VRCNext ever saw. Skipped when those records already reach it.
  */
 function withOldest(
   events: readonly VrcTimelineEvent[] | undefined,
