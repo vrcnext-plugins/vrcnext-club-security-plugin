@@ -17,7 +17,7 @@ import type { Preset } from './settings.js';
 export type Verdict = 'met' | 'unverified' | 'failed';
 
 export interface Check {
-  readonly key: 'age' | 'pcRank' | 'questRank' | 'group' | 'friend' | 'trust';
+  readonly key: 'age' | 'pcRank' | 'questRank' | 'iosRank' | 'group' | 'friend' | 'trust';
   readonly label: string;
   /** Two or three words for a pill, where the colour already says whether it holds. */
   readonly short: string;
@@ -54,6 +54,7 @@ export const CHECK_EMOJI: Readonly<Record<Check['key'], string>> = {
   age: '🔞',
   pcRank: '🖥️',
   questRank: '📱',
+  iosRank: '🍏',
   group: '👥',
   friend: '🤝',
   trust: '🛡️',
@@ -75,8 +76,15 @@ function ageCheck(facts: Facts): Check {
   return { key: 'age', label, short, verdict: 'unverified', detail };
 }
 
-function rankCheck(key: 'pcRank' | 'questRank', label: string, rank: string, minimum: string): Check {
-  const platform = key === 'pcRank' ? 'PC' : 'Quest';
+/** What each rank check calls its platform, in the two or three words a pill has room for. */
+const RANK_PLATFORM: Readonly<Record<'pcRank' | 'questRank' | 'iosRank', string>> = {
+  pcRank: 'PC',
+  questRank: 'Quest',
+  iosRank: 'iOS',
+};
+
+function rankCheck(key: 'pcRank' | 'questRank' | 'iosRank', label: string, rank: string, minimum: string): Check {
+  const platform = RANK_PLATFORM[key];
   const have = rankIndex(rank);
   const want = rankIndex(minimum);
   if (have === undefined || want === undefined) {
@@ -140,7 +148,7 @@ export function worst(verdicts: readonly Verdict[]): Verdict {
 }
 
 /** The two checks that describe an avatar, which is all an avatar switch can be judged on. */
-export const AVATAR_CHECKS: readonly Check['key'][] = ['pcRank', 'questRank'];
+export const AVATAR_CHECKS: readonly Check['key'][] = ['pcRank', 'questRank', 'iosRank'];
 
 export interface EvaluateOptions {
   /** Only these checks; the rest are not run and not reported. Everything, when absent. */
@@ -153,6 +161,7 @@ export function evaluate(preset: Preset, facts: Facts, options: EvaluateOptions 
   if (preset.requireAge && wanted('age')) checks.push(ageCheck(facts));
   if (preset.minPcRank !== 'any' && wanted('pcRank')) checks.push(rankCheck('pcRank', 'PC avatar rank', facts.pcRank, preset.minPcRank));
   if (preset.minQuestRank !== 'any' && wanted('questRank')) checks.push(rankCheck('questRank', 'Quest avatar rank', facts.questRank, preset.minQuestRank));
+  if (preset.minIosRank !== 'any' && wanted('iosRank')) checks.push(rankCheck('iosRank', 'iOS avatar rank', facts.iosRank, preset.minIosRank));
   if (preset.requiredGroup !== '' && wanted('group')) checks.push(groupCheck(facts, preset.requiredGroup));
   if (preset.requireFriend && wanted('friend')) checks.push(friendCheck(facts));
   // Zero is "any": every profile clears it, so asking for it would only print a line nobody set.

@@ -128,3 +128,37 @@ test('an avatar switch into an unknown rank is a warning, and a good one is stil
   // Neither floor set: nothing to judge the new avatar against, so there is no report to send.
   assert.deepEqual(evaluate(preset({ requireAge: true }), facts({ pcRank: '' }), { only: AVATAR_CHECKS }).checks, []);
 });
+
+test('iOS is a rank floor like the other two, and judged from the avatar’s iOS build', () => {
+  const p = preset({ minIosRank: 'Good' });
+  const met = evaluate(p, facts({ iosRank: 'Excellent' })).checks.find((c) => c.key === 'iosRank');
+  assert.deepEqual([met?.verdict, met?.short], ['met', 'iOS Excellent']);
+
+  const missed = evaluate(p, facts({ iosRank: 'Poor' })).checks.find((c) => c.key === 'iosRank');
+  assert.deepEqual([missed?.verdict, missed?.detail], ['failed', 'Poor, needs Good or better']);
+
+  // An avatar with no iOS build has no iOS rank, which is unverified rather than a failure:
+  // most avatars have none, and "not built for iOS" is not "built badly".
+  const absent = evaluate(p, facts({ iosRank: '' })).checks.find((c) => c.key === 'iosRank');
+  assert.deepEqual([absent?.verdict, absent?.short], ['unverified', 'iOS unknown']);
+
+  const off = evaluate(preset({ minIosRank: 'any' }), facts({ iosRank: '' })).checks.filter((c) => c.key === 'iosRank');
+  assert.deepEqual(off, [], 'the lowest option checks nothing at all');
+});
+
+test('VeryPoor or better demands a rank; Unknown or better demands nothing', () => {
+  // The two rungs read like synonyms and are not, which is why the lowest is labelled as part
+  // of the same scale rather than as "Any".
+  const unrated = facts({ pcRank: '' });
+  const unchecked = evaluate(preset({ minPcRank: 'any' }), unrated).checks.filter((c) => c.key === 'pcRank');
+  assert.deepEqual(unchecked, [], 'Unknown or better measures nothing');
+
+  const floored = evaluate(preset({ minPcRank: 'VeryPoor' }), unrated).checks.find((c) => c.key === 'pcRank');
+  assert.equal(floored?.verdict, 'unverified', 'an avatar nothing can rank does not clear the lowest floor');
+
+  // Every rank that exists does clear it, which is the other half of the meaning.
+  for (const rank of ['Excellent', 'Good', 'Medium', 'Poor', 'VeryPoor'] as const) {
+    const check = evaluate(preset({ minPcRank: 'VeryPoor' }), facts({ pcRank: rank })).checks.find((c) => c.key === 'pcRank');
+    assert.equal(check?.verdict, 'met', `${rank} clears the lowest floor`);
+  }
+});

@@ -85,6 +85,7 @@ export const TEMPLATE_VARIABLES = {
   presetRequiredFriend: '"Friend" when this preset requires friendship',
   presetRequiredPcRank: 'The PC rank floor this preset asks for, in words',
   presetRequiredQuestRank: 'The Quest rank floor this preset asks for, in words',
+  presetRequiredIosRank: 'The iOS rank floor this preset asks for, in words',
   presetRequiredGroup: 'The group this preset requires membership of',
   presetRequiredTrustScore: 'The trust score floor this preset asks for, e.g. 75%',
   event: 'join or avatar',
@@ -125,6 +126,9 @@ export const TEMPLATE_VARIABLES = {
   questRank: 'Quest performance rank',
   questRankText: 'Quest rank in words',
   questRankEmoji: 'Quest rank as a coloured circle',
+  iosRank: 'iOS performance rank',
+  iosRankText: 'iOS rank in words',
+  iosRankEmoji: 'iOS rank as a coloured circle',
   logText: 'What they have been doing recently, as bullet points',
   inGroup: 'true when they are in the required group',
   inGroupText: 'Group membership in words',
@@ -210,8 +214,17 @@ export function embedOf(preset: Preset): EmbedTemplate {
   return preset.discord.useCustomEmbed ? preset.discord.embed : completeEmbed(DEFAULT_EMBED);
 }
 
+/**
+ * The floors a preset can ask for, as one ordered scale.
+ *
+ * Unknown sits below VeryPoor on it, which is what makes the list read correctly: `Unknown or
+ * better` accepts anything and so checks nothing, while `VeryPoor or better` — the next rung —
+ * accepts every rank that exists but *not* an avatar nothing could rank. Those two look like
+ * synonyms when the first is called `Any`, and they are not: the second is how a club says the
+ * avatar has to be assessable at all.
+ */
 const RANK_OPTIONS = [
-  { value: 'any', label: 'Any' },
+  { value: 'any', label: 'Unknown or better' },
   ...[...PERFORMANCE_RANKS].reverse().map((rank) => ({ value: rank, label: `${rank} or better` })),
 ] as const;
 
@@ -262,6 +275,12 @@ export const preset = {
   minQuestRank: {
     kind: 'select',
     label: 'Quest avatar rank at least',
+    default: 'any',
+    options: RANK_OPTIONS,
+  },
+  minIosRank: {
+    kind: 'select',
+    label: 'iOS avatar rank at least',
     default: 'any',
     options: RANK_OPTIONS,
   },

@@ -269,3 +269,17 @@ test('a profile VRCNext knows nothing about drops all three cards rather than sa
   const names = (embed?.fields ?? []).map((f) => f.name);
   assert.deepEqual(names.filter((n) => ['Activity', 'Moderation', 'Info'].includes(n)), []);
 });
+
+test('the Avatar field lists every platform the avatar is built for, iOS included', () => {
+  const values = reportValues(report({}, { avatarName: 'Ava', avatarId: 'avtr_1', pcRank: 'Good', questRank: 'Poor', iosRank: 'Medium' }));
+  assert.equal(
+    values['ranksText'],
+    '- 🖥️ PC: 🔵 Good\n- 📱 Quest: 🟠 Poor\n- 🍏 iOS: 🟡 Medium',
+  );
+  assert.equal(values['iosRank'], 'Medium');
+  assert.equal(values['iosRankText'], 'Medium');
+
+  // An avatar with no iOS build drops that line rather than printing an unknown.
+  const noIos = reportValues(report({}, { avatarName: 'Ava', pcRank: 'Good', questRank: '', iosRank: '' }));
+  assert.equal(noIos['ranksText'], '- 🖥️ PC: 🔵 Good');
+});

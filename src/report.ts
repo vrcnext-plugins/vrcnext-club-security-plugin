@@ -96,6 +96,7 @@ function ranksText(facts: Facts): string {
   const lines = [
     ['🖥️ PC', facts.pcRank] as const,
     ['📱 Quest', facts.questRank] as const,
+    ['🍏 iOS', facts.iosRank] as const,
   ]
     .filter(([, rank]) => rank !== '')
     .map(([label, rank]) => `- ${label}: ${rankEmoji(rank)} ${rankLabel(rank)}`);
@@ -121,6 +122,7 @@ function presetWants(preset: Preset): TemplateValues {
     presetRequiredFriend: preset.requireFriend ? 'Friend' : undefined,
     presetRequiredPcRank: preset.minPcRank === 'any' ? undefined : rankLabel(preset.minPcRank),
     presetRequiredQuestRank: preset.minQuestRank === 'any' ? undefined : rankLabel(preset.minQuestRank),
+    presetRequiredIosRank: preset.minIosRank === 'any' ? undefined : rankLabel(preset.minIosRank),
     presetRequiredGroup: preset.requiredGroup === '' ? undefined : preset.requiredGroup,
     // Zero is "any", the same bargain `evaluate` makes when it leaves the check out entirely.
     presetRequiredTrustScore: preset.minTrustScore > 0 ? `${String(preset.minTrustScore)}%` : undefined,
@@ -225,6 +227,9 @@ export function reportValues(report: Report): TemplateValues {
     questRank: facts.questRank === '' ? undefined : facts.questRank,
     questRankText: rankLabel(facts.questRank),
     questRankEmoji: rankEmoji(facts.questRank),
+    iosRank: facts.iosRank === '' ? undefined : facts.iosRank,
+    iosRankText: rankLabel(facts.iosRank),
+    iosRankEmoji: rankEmoji(facts.iosRank),
     avatar: facts.avatarName,
     avatarId: facts.avatarId,
     avatarImageUrl: facts.avatarImageUrl,

@@ -31,6 +31,7 @@ export interface Facts {
   readonly avatarImageUrl: string;
   readonly pcRank: PerformanceRank;
   readonly questRank: PerformanceRank;
+  readonly iosRank: PerformanceRank;
   /** Groups the player shows publicly; `undefined` when VRCNext did not answer. */
   readonly groupIds: readonly string[] | undefined;
   readonly rejoin: Rejoin;
@@ -102,6 +103,7 @@ export const UNKNOWN_FACTS: Facts = {
   avatarImageUrl: '',
   pcRank: '',
   questRank: '',
+  iosRank: '',
   groupIds: undefined,
   rejoin: UNKNOWN_REJOIN,
   timeline: undefined,
@@ -234,7 +236,7 @@ interface AvatarLookup {
   readonly extraApiRequests?: boolean | undefined;
 }
 
-async function avatarFacts(vrchat: VrchatApi, joiner: Joiner, lookup: AvatarLookup): Promise<Pick<Facts, 'avatarId' | 'avatarName' | 'avatarImageUrl' | 'pcRank' | 'questRank'>> {
+async function avatarFacts(vrchat: VrchatApi, joiner: Joiner, lookup: AvatarLookup): Promise<Pick<Facts, 'avatarId' | 'avatarName' | 'avatarImageUrl' | 'pcRank' | 'questRank' | 'iosRank'>> {
   const { instance, signal, note } = lookup;
   const known = instance?.users.find((u) => u.id === joiner.userId);
   let avatarId = known?.avatarId ?? '';
@@ -244,7 +246,7 @@ async function avatarFacts(vrchat: VrchatApi, joiner: Joiner, lookup: AvatarLook
     avatarId = found?.avatarId ?? '';
     avatarName = found?.avatarName ?? avatarName;
   }
-  if (avatarId === '') return { avatarId: '', avatarName, avatarImageUrl: '', pcRank: '', questRank: '' };
+  if (avatarId === '') return { avatarId: '', avatarName, avatarImageUrl: '', pcRank: '', questRank: '', iosRank: '' };
   const avatar = await vrchat.avatar(avatarId, { signal });
   return {
     avatarId,
@@ -268,6 +270,7 @@ async function avatarFacts(vrchat: VrchatApi, joiner: Joiner, lookup: AvatarLook
     }, note),
     pcRank: avatar?.pcRank ?? '',
     questRank: avatar?.questRank ?? '',
+    iosRank: avatar?.iosRank ?? '',
   };
 }
 
@@ -455,7 +458,7 @@ export async function collectFacts(
         ];
       },
     }, options.onImages),
-    ...(avatar ?? { avatarId: '', avatarName: '', avatarImageUrl: '', pcRank: '', questRank: '' }),
+    ...(avatar ?? { avatarId: '', avatarName: '', avatarImageUrl: '', pcRank: '', questRank: '', iosRank: '' }),
     groupIds: groups,
     rejoin: location === '' ? UNKNOWN_REJOIN : rejoinIn(timeline, location),
     timeline,
