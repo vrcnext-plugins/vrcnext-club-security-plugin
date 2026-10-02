@@ -54,6 +54,25 @@ test('the default template leads with the verdict and lists every check', () => 
   assert.equal(lines.length, 5, 'the rejoin line is dropped for a first visit');
 });
 
+test('the title counts the preset\'s own history of them, and says nothing without one', () => {
+  const title = (r: Report): unknown =>
+    renderEmbed(completeEmbed(DEFAULT_EMBED), reportValues(r), { at: new Date(0) })?.title;
+
+  assert.equal(title(report()), '"Tupper" joined',
+    'no timeline, so the count is dropped rather than claiming this is their first');
+
+  const elsewhere = 'wrld_b:7~group(grp_a)~groupAccessType(public)';
+  const seen = report({ group: 'grp_a' }, {
+    timeline: [
+      { id: '1', type: 'meet_again', timestamp: '2026-09-01T12:00:00Z', location: elsewhere, worldName: 'Other' },
+      { id: '2', type: 'instance_join', timestamp: '2026-09-20T12:00:00Z', location: elsewhere, worldName: 'Other' },
+    ],
+    rejoin: { seenHere: true, lastAt: '2026-09-20T12:00:00Z' },
+  });
+  assert.equal(title(seen), '"Tupper" rejoined for the 2nd event',
+    'one instance in the history plus the one they are in now');
+});
+
 test('verdict variables follow the worst check', () => {
   const values = reportValues(report({}, { pcRank: 'VeryPoor' }));
   assert.deepEqual([values['result'], values['resultEmoji'], values['resultColor']], ['failed', '⛔', 'red']);
