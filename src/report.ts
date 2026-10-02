@@ -76,6 +76,18 @@ function requirementsText(checks: Evaluation['checks']): string {
     .join('\n');
 }
 
+/**
+ * The avatar and both ranks on one line: `Ava (PC Good · Quest Unknown)`.
+ *
+ * Says "Unknown" rather than leaving a rank out, because an unknown rank is the news: it is
+ * what makes a check `unverified` rather than passed, and a line that simply omitted it would
+ * read as though VRChat had nothing to rate.
+ */
+export function avatarLine(facts: Pick<Facts, 'avatarName' | 'pcRank' | 'questRank'>): string {
+  const name = facts.avatarName === '' ? 'an avatar VRCNext could not name' : facts.avatarName;
+  return `${name} (PC ${rankLabel(facts.pcRank)} · Quest ${rankLabel(facts.questRank)})`;
+}
+
 /** One line per platform the avatar was rated on, skipping the ones VRChat says nothing about. */
 function ranksText(facts: Facts): string {
   const lines = [
@@ -166,9 +178,7 @@ export function reportValues(report: Report): TemplateValues {
       : (facts.avatarId === '' ? facts.avatarName : `["${facts.avatarName}"](${vrchatUrl('avatar', facts.avatarId)})`),
     // Empty, not "Unknown", when VRCNext could not name the avatar: an embed field whose value
     // renders empty is dropped, and a box saying "Unknown" is worse than no box.
-    avatarPlain: facts.avatarName === ''
-      ? undefined
-      : `${facts.avatarName} (PC ${rankLabel(facts.pcRank)} · Quest ${rankLabel(facts.questRank)})`,
+    avatarPlain: facts.avatarName === '' ? undefined : avatarLine(facts),
     trustScore: facts.trust?.percent,
     trustScoreText: facts.trust === undefined
       ? undefined

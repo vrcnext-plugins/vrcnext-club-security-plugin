@@ -112,3 +112,18 @@ test('an avatar switch is judged on the avatar alone, trust included', () => {
   const result = evaluate(preset({ minTrustScore: 99 }), facts({ trust: TRUSTED }), { only: AVATAR_CHECKS });
   assert.equal(result.checks.some((c) => c.key === 'trust'), false);
 });
+
+test('an avatar switch into an unknown rank is a warning, and a good one is still a report', () => {
+  const watching = preset({ minPcRank: 'Medium', requireAge: true, requiredGroup: 'grp_a' });
+
+  const unknown = evaluate(watching, facts({ pcRank: '', questRank: '' }), { only: AVATAR_CHECKS });
+  assert.equal(unknown.verdict, 'unverified', 'a rank VRChat did not give is not a pass');
+  assert.deepEqual(unknown.checks.map((c) => c.detail), ['rank unknown'], 'and the age and group checks stay out of it');
+
+  const good = evaluate(watching, facts({ pcRank: 'Excellent' }), { only: AVATAR_CHECKS });
+  assert.equal(good.verdict, 'met');
+  assert.equal(good.checks.length, 1, 'a check it passed is still a check, so the switch is still reported');
+
+  // Neither floor set: nothing to judge the new avatar against, so there is no report to send.
+  assert.deepEqual(evaluate(preset({ requireAge: true }), facts({ pcRank: '' }), { only: AVATAR_CHECKS }).checks, []);
+});

@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 
-import { activityLog } from './activity.js';
+import { EMBED_LIMITS } from '@vrcnext/plugin-api';
+
+import { activityLog, LOG_LINES } from './activity.js';
 
 const LOTUS = 'wrld_aaaa1111-2222-3333-4444-555566667777:12345~group(grp_x)~groupAccessType(public)';
 
@@ -24,12 +26,26 @@ describe('activityLog', () => {
     ]);
   });
 
-  it('keeps only the newest few', () => {
-    // Nine visits to nine different instances, so nothing collapses and the cap is what bites.
-    const many = Array.from({ length: 9 }, (_, i) =>
-      event('instance_join', `2026-09-2${String(i + 1)}T10:00:00Z`, `wrld_w:${String(i)}~public`, 'World'));
-    expect(activityLog(many).split('\n')).toHaveLength(5);
-    expect(activityLog(many, 2).split('\n')).toHaveLength(2);
+  /** `count` visits to that many different instances, so nothing collapses. */
+  function visits(count: number, worldName = 'World'): { type: string; timestamp: string; location: string; worldName: string }[] {
+    return Array.from({ length: count }, (_, i) =>
+      event('instance_join', `2026-09-27T10:00:${String(i).padStart(2, '0')}Z`, `wrld_w${String(i)}:${String(i)}~public`, worldName));
+  }
+
+  it('asks for as many lines as the field can hold, and takes a cap when given one', () => {
+    expect(activityLog(visits(30)).split('\n')).toHaveLength(LOG_LINES);
+    expect(activityLog(visits(30), 2).split('\n')).toHaveLength(2);
+    // Fewer records than the ceiling: every one of them is shown.
+    expect(activityLog(visits(4)).split('\n')).toHaveLength(4);
+  });
+
+  it('never returns more than Discord will accept in a field', () => {
+    // A world name long enough that twelve of these lines would overrun 1024 characters.
+    const log = activityLog(visits(30, 'YTS 2.1 - YouTube Search, Subtitles, Quest and more'));
+    expect(log.length).toBeLessThanOrEqual(EMBED_LIMITS.fieldValue);
+    expect(log.split('\n').length).toBeLessThan(LOG_LINES);
+    // Cut between lines, never inside one: every line still ends in its own timestamp.
+    for (const line of log.split('\n')) expect(line).toMatch(/(<t:\d+:R>|^- \.\.\.$)/);
   });
 
   it('collapses the same thing happening twice and names a group it is told about', () => {

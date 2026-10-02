@@ -17,7 +17,7 @@ import { notify } from './src/notify.js';
 import { ReportPanel } from './src/panel.js';
 import { lastJoin, selfCheck, type Replay } from './src/replay.js';
 import { AVATAR_CHECKS, evaluate } from './src/requirements.js';
-import { type Report } from './src/report.js';
+import { avatarLine, type Report } from './src/report.js';
 import { settings, type Preset } from './src/settings.js';
 
 type Ctx = PluginContext<typeof settings>;
@@ -170,7 +170,16 @@ class ClubSecurity {
     }
   }
 
-  /** The avatar limits, re-checked against what they changed into. */
+  /**
+   * The avatar limits, re-checked against what they changed into.
+   *
+   * Every switch is logged, whatever the verdict. A rank that came back `met` is still the one
+   * fact nothing else records — the player wore something else and it was fine — and a rank that
+   * came back unknown is not a pass: the check is `unverified`, the report is orange, and it
+   * goes out on every channel exactly like one that failed. The only thing a preset's rank
+   * floors decide is whether there is a requirement to report *against*; with neither floor set
+   * there is nothing to judge, so the switch is logged and nothing is sent.
+   */
   async #onAvatarChange(joiner: Joiner, instance: VrcInstance): Promise<void> {
     const presets = this.#presetsFor(joiner, instance).filter((p) => p.watchAvatarChanges);
     if (presets.length === 0) return;
@@ -180,9 +189,13 @@ class ClubSecurity {
         onImages: (note) => { this.#ctx.logger.debug(note); },
         extraApiRequests: this.#ctx.settings.get('allowExtraApiRequests'),
       });
+      this.#ctx.logger.info(`${joiner.name} switched avatar: ${avatarLine(facts)}`);
       for (const preset of presets) {
         const evaluation = evaluate(preset, facts, { only: AVATAR_CHECKS });
-        if (evaluation.checks.length === 0) continue;
+        if (evaluation.checks.length === 0) {
+          this.#ctx.logger.debug(`Preset "${preset.name}" sets no avatar rank floor, so the switch is not reported.`);
+          continue;
+        }
         await this.#send({ at: Date.now(), kind: 'avatar', preset, joiner, instance, facts, evaluation });
       }
     } catch (error) {

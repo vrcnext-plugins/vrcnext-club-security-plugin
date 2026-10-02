@@ -7,10 +7,24 @@
  * which format they are in.
  */
 
-import { userEventLines, type VrcTimelineEvent } from '@vrcnext/plugin-api';
+import { EMBED_LIMITS, fitLines, userEventLines, type VrcTimelineEvent } from '@vrcnext/plugin-api';
 
-/** How many lines a log field carries by default. Discord caps a field at 1024 characters. */
-export const LOG_LINES = 5;
+/** The bullet each line carries, and the gap row's own line once it has one. */
+const BULLET = '- ';
+const GAP_LINE = `${BULLET}...`;
+
+/**
+ * How many lines a log field asks for.
+ *
+ * Discord caps a field value at 1024 characters, so the real limit is characters and this is
+ * only a ceiling on the work. Measured against real lines: "Came online <t:…:R>" is 30
+ * characters with its bullet, a plain arrival about 65, and a long one — ``Met again in `YTS 2.1
+ * - YouTube Search, Subtitles, Quest #27377` (Friends+) <t:…:R>`` — about 85. Twelve of even
+ * that worst case is 1020, so twelve lines fit whatever the history turns out to look like,
+ * while five spent four fifths of the field on nothing. {@link fitLines} is what actually
+ * guarantees it, so this number can be generous without ever producing a cut-off line.
+ */
+export const LOG_LINES = 12;
 
 /**
  * The newest records as `- Visited \`Club X #12345\` (Group+) ×2 <t:…:R>`, newest first, ending
@@ -31,7 +45,7 @@ export function activityLog(
   limit = LOG_LINES,
   groupName?: (groupId: string) => string | undefined,
 ): string {
-  return userEventLines(events, { format: 'discord', limit, oldest: true, time: 'relative', ...(groupName ? { groupName } : {}) })
-    .map((line) => `- ${line}`)
-    .join('\n');
+  const lines = userEventLines(events, { format: 'discord', limit, oldest: true, time: 'relative', ...(groupName ? { groupName } : {}) })
+    .map((line) => `${BULLET}${line}`);
+  return fitLines(lines, EMBED_LIMITS.fieldValue, { gap: GAP_LINE }).join('\n');
 }
