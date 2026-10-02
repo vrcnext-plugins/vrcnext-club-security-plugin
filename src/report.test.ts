@@ -182,6 +182,23 @@ test('the embed follows the plugin\'s own until a club switches to its own', () 
   assert.equal(off.discord.embed.title, 'mine');
 });
 
+test('the three profile cards are switches on the plugin\'s embed, and nothing on a custom one', () => {
+  const defaults = defaultsFor(presetSchema);
+  const names = (p: Preset): readonly string[] => embedOf(p).fields.map((f) => f.name);
+  assert.deepEqual(names(defaults), ['Requirements', 'Avatar', 'Activity', 'Moderation', 'Info', 'Recently'],
+    'all three are on out of the box');
+
+  const some: Preset = { ...defaults, discord: { ...defaults.discord, showModeration: false, showInfo: false } };
+  assert.deepEqual(names(some), ['Requirements', 'Avatar', 'Activity', 'Recently']);
+
+  // A club that writes its own embed deletes the field instead; the switches say nothing there.
+  const custom: Preset = {
+    ...some,
+    discord: { ...some.discord, useCustomEmbed: true, embed: completeEmbed(DEFAULT_EMBED) },
+  };
+  assert.deepEqual(names(custom), ['Requirements', 'Avatar', 'Activity', 'Moderation', 'Info', 'Recently']);
+});
+
 /** `requirementsText` is one of the template's values, typed as anything a template may hold. */
 function text(values: Record<string, unknown>, key: string): string {
   const value = values[key];

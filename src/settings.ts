@@ -204,6 +204,19 @@ export function templatesOf(preset: Preset): { readonly text: string; readonly v
 }
 
 /**
+ * The fields of {@link DEFAULT_EMBED} a preset can switch off, by the name each one carries.
+ *
+ * Only the plugin's own embed has them: a club with a custom embed deletes the field it does not
+ * want, which is both more direct and the only thing a switch could mean once the field's name
+ * is theirs to change.
+ */
+const OPTIONAL_FIELDS = [
+  ['Activity', 'showActivity'],
+  ['Moderation', 'showModeration'],
+  ['Info', 'showInfo'],
+] as const;
+
+/**
  * The embed a preset actually posts.
  *
  * Same bargain as {@link templatesOf}: with the switch off the preset follows the plugin's own
@@ -211,7 +224,10 @@ export function templatesOf(preset: Preset): { readonly text: string; readonly v
  * club's own embed wins. Turning it off does not discard what they wrote.
  */
 export function embedOf(preset: Preset): EmbedTemplate {
-  return preset.discord.useCustomEmbed ? preset.discord.embed : completeEmbed(DEFAULT_EMBED);
+  if (preset.discord.useCustomEmbed) return preset.discord.embed;
+  const base = completeEmbed(DEFAULT_EMBED);
+  const off = new Set<string>(OPTIONAL_FIELDS.filter(([, key]) => !preset.discord[key]).map(([name]) => name));
+  return off.size === 0 ? base : { ...base, fields: base.fields.filter((field) => !off.has(field.name)) };
 }
 
 /**
@@ -377,6 +393,30 @@ export const preset = {
         label: 'Use a custom embed',
         description: 'Off means the plugin\'s own embed, which improves as the plugin does. Your edits are kept either way.',
         default: false,
+      },
+      // The three profile cards, as switches on the plugin's own embed. A club that writes its
+      // own embed deletes the field instead, so these fold away with the rest when the custom
+      // embed takes over.
+      showActivity: {
+        kind: 'boolean',
+        label: 'Add the Activity field',
+        description: 'How often you have met, how long together, and how much VRCNext has on them.',
+        default: true,
+        hidden: (values) => values['useCustomEmbed'] === true,
+      },
+      showModeration: {
+        kind: 'boolean',
+        label: 'Add the Moderation field',
+        description: 'What you have done to them — blocked, muted, avatar hidden. Dropped anyway when you have done nothing.',
+        default: true,
+        hidden: (values) => values['useCustomEmbed'] === true,
+      },
+      showInfo: {
+        kind: 'boolean',
+        label: 'Add the Info field',
+        description: 'Trust rank, status, languages, pronouns and when they joined VRChat.',
+        default: true,
+        hidden: (values) => values['useCustomEmbed'] === true,
       },
       embed: {
         kind: 'embed',
