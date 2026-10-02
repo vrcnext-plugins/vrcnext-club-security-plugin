@@ -1,6 +1,6 @@
 {
   "name": "vrcnext-club-security-plugin",
-  "version": "2.14.0",
+  "version": "2.14.1",
   "private": true,
   "description": "VRCNext plugin: per-club presets that report who joins your instance and whether they meet the club's rules.",
   "license": "Unlicense",
