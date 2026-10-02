@@ -7,7 +7,7 @@
  * which format they are in.
  */
 
-import { EMBED_LIMITS, fitLines, userEventLines, type VrcTimelineEvent } from '@vrcnext/plugin-api';
+import { EMBED_LIMITS, fitLines, instancesSeen, userEventLines, type VrcTimelineEvent } from '@vrcnext/plugin-api';
 
 /** The bullet each line carries, and the gap row's own line once it has one. */
 const BULLET = '- ';
@@ -63,14 +63,37 @@ function withOldest(
   return [...events, oldest];
 }
 
+export interface ActivityLogOptions {
+  readonly limit?: number;
+  readonly groupName?: (groupId: string) => string | undefined;
+  /** VRCNext's genuinely oldest record for this player, when the database could be read. */
+  readonly oldest?: VrcTimelineEvent;
+  /**
+   * How many instances VRCNext has ever recorded them in, when that is known.
+   *
+   * A timeline read answers with ten records, so the log almost never *drops* a row — it is
+   * handed too few to begin with. Counting the rows it printed therefore cannot tell whether
+   * anything is missing, and a player with five thousand instances rendered as eight unbroken
+   * lines ending five years ago. This is the number that knows better.
+   */
+  readonly instancesKnown?: number;
+}
+
 export function activityLog(
   events: readonly VrcTimelineEvent[] | undefined,
-  limit = LOG_LINES,
-  groupName?: (groupId: string) => string | undefined,
-  oldest?: VrcTimelineEvent,
+  options: ActivityLogOptions = {},
 ): string {
-  const all = withOldest(events, oldest);
-  const lines = userEventLines(all, { format: 'discord', limit, oldest: true, time: 'relative', ...(groupName ? { groupName } : {}) })
-    .map((line) => `${BULLET}${line}`);
+  const limit = options.limit ?? LOG_LINES;
+  const all = withOldest(events, options.oldest);
+  const shown = instancesSeen(all).length;
+  const knownGap = options.instancesKnown !== undefined && options.instancesKnown > shown;
+  const lines = userEventLines(all, {
+    format: 'discord',
+    limit,
+    oldest: true,
+    time: 'relative',
+    ...(knownGap ? { knownGap: true } : {}),
+    ...(options.groupName ? { groupName: options.groupName } : {}),
+  }).map((line) => `${BULLET}${line}`);
   return fitLines(lines, EMBED_LIMITS.fieldValue, { gap: GAP_LINE }).join('\n');
 }

@@ -22,7 +22,7 @@ import {
   type VrcInstance,
 } from '@vrcnext/plugin-api';
 
-import { activityLog, LOG_LINES } from './activity.js';
+import { activityLog, LOG_LINES, type ActivityLogOptions } from './activity.js';
 import { eventCount } from './events.js';
 import type { Facts, Joiner } from './facts.js';
 import { VERDICT_COLOR, VERDICT_EMOJI, VERDICT_TEXT, type Evaluation } from './requirements.js';
@@ -184,6 +184,16 @@ function profileCards(facts: Facts): TemplateValues {
   };
 }
 
+/** What the activity log needs from the facts, kept out of the value map's line budget. */
+function logOptions(facts: Facts): ActivityLogOptions {
+  return {
+    limit: LOG_LINES,
+    groupName: (id) => facts.timelineGroups.get(id),
+    ...(facts.oldestEvent === undefined ? {} : { oldest: facts.oldestEvent }),
+    ...(facts.seenLocations === undefined ? {} : { instancesKnown: facts.seenLocations.length }),
+  };
+}
+
 export function reportValues(report: Report): TemplateValues {
   const { facts, joiner, instance, evaluation, preset } = report;
   const at = new Date(report.at);
@@ -249,7 +259,7 @@ export function reportValues(report: Report): TemplateValues {
     trustText: facts.trust?.description,
     ranksText: ranksText(facts),
     requirementsText: requirementsText(evaluation.checks),
-    logText: activityLog(facts.timeline, LOG_LINES, (id) => facts.timelineGroups.get(id), facts.oldestEvent),
+    logText: activityLog(facts.timeline, logOptions(facts)),
     profileUrl: vrchatUrl('user', joiner.userId),
     userImageUrl: facts.userImageUrl,
     platform: facts.platform,

@@ -34,7 +34,7 @@ describe('activityLog', () => {
 
   it('asks for as many lines as the field can hold, and takes a cap when given one', () => {
     expect(activityLog(visits(30)).split('\n')).toHaveLength(LOG_LINES);
-    expect(activityLog(visits(30), 2).split('\n')).toHaveLength(2);
+    expect(activityLog(visits(30), { limit: 2 }).split('\n')).toHaveLength(2);
     // Fewer records than the ceiling: every one of them is shown.
     expect(activityLog(visits(4)).split('\n')).toHaveLength(4);
   });
@@ -52,7 +52,7 @@ describe('activityLog', () => {
     const log = activityLog([
       event('instance_join', '2026-09-27T12:00:00Z', LOTUS, 'DragonZ Lotus'),
       event('instance_join', '2026-09-27T11:00:00Z', LOTUS, 'DragonZ Lotus'),
-    ], 5, (id) => (id === 'grp_x' ? 'Lotus Crew' : undefined));
+    ], { limit: 5, groupName: (id: string) => (id === 'grp_x' ? 'Lotus Crew' : undefined) });
     expect(log).toBe('- Visited `DragonZ Lotus #12345` by `Lotus Crew` (Group Public) ×2 <t:1790510400:R>');
   });
 
@@ -90,7 +90,7 @@ describe('the pinned oldest row', () => {
   const first = { type: 'first_meet', timestamp: '2023-01-04T20:00:00Z', location: 'wrld_b:9', worldName: 'Hub' };
 
   it('is the database’s oldest record, not the oldest of the ten the page returned', () => {
-    const withDb = activityLog(window_, 5, undefined, first).split('\n');
+    const withDb = activityLog(window_, { limit: 5, oldest: first }).split('\n');
     expect(withDb.at(-1)).toContain('Hub');
 
     // And with more arrivals than rows, the gap stands between the window and that pin.
@@ -98,19 +98,52 @@ describe('the pinned oldest row', () => {
       type: 'meet_again', timestamp: `2026-09-${String(10 + i).padStart(2, '0')}T10:00:00Z`,
       location: `wrld_a:${String(i)}`, worldName: 'Lotus',
     }));
-    const capped = activityLog(busy, 5, undefined, first).split('\n');
+    const capped = activityLog(busy, { limit: 5, oldest: first }).split('\n');
     expect(capped).toHaveLength(5);
     expect(capped.at(-2)).toBe('- ...');
     expect(capped.at(-1)).toContain('Hub');
   });
 
   it('is only as old as the window when the database was not readable', () => {
-    expect(activityLog(window_, 5)).not.toMatch(/Hub/);
+    expect(activityLog(window_, { limit: 5 })).not.toMatch(/Hub/);
   });
 
   it('is not duplicated when the window already reaches that far back', () => {
     const reaching = [...window_, first];
-    const lines = activityLog(reaching, 5, undefined, first).split('\n').filter((l) => l.includes('Hub'));
+    const lines = activityLog(reaching, { limit: 5, oldest: first }).split('\n').filter((l) => l.includes('Hub'));
     expect(lines).toHaveLength(1);
+  });
+});
+
+describe('the gap when the page simply had less to give', () => {
+  // The real case: a player with 5121 recorded instances whose timeline read returns ten
+  // records. Nothing is ever dropped from a twelve-row log, so counting the rows says "all of
+  // it" — and eight lines ending five years ago render as one unbroken history.
+  const window_ = [
+    { type: 'meet_again', timestamp: '2026-10-02T22:00:00Z', location: 'wrld_a:1', worldName: 'Lotus' },
+    { type: 'meet_again', timestamp: '2026-10-02T20:00:00Z', location: 'wrld_a:2', worldName: 'Lotus' },
+  ];
+  const first = { type: 'instance_join', timestamp: '2022-01-04T18:26:02Z', location: 'wrld_z:9', worldName: 'Virtual Apartment' };
+
+  it('is drawn when the database knows of more instances than the log shows', () => {
+    const lines = activityLog(window_, { limit: 12, oldest: first, instancesKnown: 5121 }).split('\n');
+    expect(lines.at(-2)).toBe('- ...');
+    expect(lines.at(-1)).toContain('Virtual Apartment');
+  });
+
+  it('is not drawn when the log already covers every instance there is', () => {
+    const lines = activityLog(window_, { limit: 12, oldest: first, instancesKnown: 3 }).split('\n');
+    expect(lines).not.toContain('- ...');
+    expect(lines.at(-1)).toContain('Virtual Apartment');
+  });
+
+  it('is still drawn by truncation alone, with no database behind it', () => {
+    const many = Array.from({ length: 20 }, (_, i) => ({
+      type: 'meet_again', timestamp: `2026-09-${String(10 + i).padStart(2, '0')}T10:00:00Z`,
+      location: `wrld_a:${String(i)}`, worldName: 'Lotus',
+    }));
+    const lines = activityLog(many, { limit: 5 }).split('\n');
+    expect(lines).toHaveLength(5);
+    expect(lines.at(-2)).toBe('- ...');
   });
 });
