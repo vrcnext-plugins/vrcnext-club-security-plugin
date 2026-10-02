@@ -80,6 +80,8 @@ function vrchat(fake: Fake): VrchatApi {
     userTimeline: () => Promise.resolve([]),
     userGroups: () => Promise.resolve([]),
     group: () => Promise.resolve(undefined),
+    // Read from the page arrays in the real thing; nothing loaded here, so every flag is unknown.
+    moderations: () => ({ blocked: undefined, muted: undefined, chatMuted: undefined, avatarHidden: undefined, interactOff: undefined }),
   } as unknown as VrchatApi;
 }
 

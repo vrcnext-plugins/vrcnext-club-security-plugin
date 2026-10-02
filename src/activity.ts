@@ -40,12 +40,37 @@ export const LOG_LINES = 12;
  * Returns `''` when VRCNext had nothing, which drops the field from the embed rather than
  * showing an empty one.
  */
+/**
+ * The timeline with VRCNext's genuinely oldest record appended.
+ *
+ * `userEventLines({ oldest: true })` pins the oldest row it is given, and what it is given is the
+ * ten records a timeline read returns. Appending the database's own oldest makes that pin the
+ * first thing VRCNext ever saw. Skipped when the window already reaches it.
+ */
+function withOldest(
+  events: readonly VrcTimelineEvent[] | undefined,
+  oldest: VrcTimelineEvent | undefined,
+): readonly VrcTimelineEvent[] | undefined {
+  if (oldest === undefined) return events;
+  if (events === undefined) return [oldest];
+  // Two ids are the same record only when both are actually ids: `undefined === undefined` is
+  // every record matching every other one.
+  const already = events.some((e) => {
+    const sameId = e.id !== undefined && e.id !== '' && e.id === oldest.id;
+    return sameId || (e.timestamp !== '' && e.timestamp <= oldest.timestamp);
+  });
+  if (already) return events;
+  return [...events, oldest];
+}
+
 export function activityLog(
   events: readonly VrcTimelineEvent[] | undefined,
   limit = LOG_LINES,
   groupName?: (groupId: string) => string | undefined,
+  oldest?: VrcTimelineEvent,
 ): string {
-  const lines = userEventLines(events, { format: 'discord', limit, oldest: true, time: 'relative', ...(groupName ? { groupName } : {}) })
+  const all = withOldest(events, oldest);
+  const lines = userEventLines(all, { format: 'discord', limit, oldest: true, time: 'relative', ...(groupName ? { groupName } : {}) })
     .map((line) => `${BULLET}${line}`);
   return fitLines(lines, EMBED_LIMITS.fieldValue, { gap: GAP_LINE }).join('\n');
 }

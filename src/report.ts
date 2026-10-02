@@ -8,11 +8,14 @@
 
 import {
   TemplateError,
+  discordTimestamp,
+  exactDuration,
   instanceTypeLabel,
   ordinal,
   rankEmoji,
   rankLabel,
   renderTemplate,
+  statusLabel,
   trustScoreEmoji,
   timeAgo,
   type TemplateValues,
@@ -125,6 +128,60 @@ function presetWants(preset: Preset): TemplateValues {
 }
 
 /** Everything a template may name. `undefined` means "not applicable", which drops the line. */
+/**
+ * The three cards VRCNext shows on a profile, as template values.
+ *
+ * Raw values, so a club writes its own rows. Each is `undefined` rather than a stand-in when
+ * VRCNext has no answer: a row that renders empty is dropped, and "Unknown" in a box is worse
+ * than no box.
+ *
+ * reuse: all of it is on the profile payload VRCNext already sent, except `dbEntries`, which
+ * is counted over `ctx.sql` because no payload carries it.
+ */
+function profileCards(facts: Facts): TemplateValues {
+  return {
+    trustRank: facts.trustRank === '' ? undefined : facts.trustRank,
+    meets: facts.meets,
+    meetsText: facts.meets === undefined ? undefined : `${String(facts.meets)} time${facts.meets === 1 ? '' : 's'}`,
+    firstMet: facts.firstMeetDate,
+    // Two forms of every date: `…Ago` is plain text for the VR overlay and the log, `…Since` is
+    // a Discord stamp, which renders in each reader's own timezone and language and keeps
+    // counting after the message is posted. The embed defaults use the stamps.
+    firstMetAgo: facts.firstMeetDate === '' ? undefined : timeAgo(facts.firstMeetDate),
+    firstMetSince: facts.firstMeetDate === '' ? undefined : discordTimestamp(facts.firstMeetDate),
+    lastSeenAgo: facts.lastSeen === '' ? undefined : timeAgo(facts.lastSeen),
+    lastSeenSince: facts.lastSeen === '' ? undefined : discordTimestamp(facts.lastSeen),
+    timeTogether: facts.totalTimeSeconds === undefined ? undefined : exactDuration(facts.totalTimeSeconds),
+    timeTogetherSeconds: facts.totalTimeSeconds,
+    dbEntries: facts.dbEntries,
+    blocked: facts.moderations.blocked,
+    blockedEmoji: triState(facts.moderations.blocked, '🚫', '➖'),
+    muted: facts.moderations.muted,
+    mutedEmoji: triState(facts.moderations.muted, '🔇', '➖'),
+    chatMuted: facts.moderations.chatMuted,
+    chatMutedEmoji: triState(facts.moderations.chatMuted, '💬', '➖'),
+    avatarHidden: facts.moderations.avatarHidden,
+    avatarHiddenEmoji: triState(facts.moderations.avatarHidden, '🙈', '➖'),
+    interactOff: facts.moderations.interactOff,
+    interactOffEmoji: triState(facts.moderations.interactOff, '🤚', '➖'),
+    languages: facts.languages.length === 0 ? undefined : facts.languages.join(', '),
+    dateJoined: facts.dateJoined,
+    joinedAgo: facts.dateJoined === '' ? undefined : timeAgo(facts.dateJoined),
+    joinedSince: facts.dateJoined === '' ? undefined : discordTimestamp(facts.dateJoined),
+    lastLoginAgo: facts.lastLogin === '' ? undefined : timeAgo(facts.lastLogin),
+    lastLoginSince: facts.lastLogin === '' ? undefined : discordTimestamp(facts.lastLogin),
+    lastActivityAgo: facts.lastActivity === '' ? undefined : timeAgo(facts.lastActivity),
+    lastActivitySince: facts.lastActivity === '' ? undefined : discordTimestamp(facts.lastActivity),
+    pronouns: facts.pronouns === '' ? undefined : facts.pronouns,
+    status: facts.status === '' ? undefined : facts.status,
+    statusText: facts.status === '' ? undefined : statusLabel(facts.status),
+    statusDescription: facts.statusDescription === '' ? undefined : facts.statusDescription,
+    note: facts.note === '' ? undefined : facts.note,
+    allowAvatarCopying: facts.allowAvatarCopying,
+    allowAvatarCopyingText: facts.allowAvatarCopying === undefined ? undefined : yesNo(facts.allowAvatarCopying),
+  };
+}
+
 export function reportValues(report: Report): TemplateValues {
   const { facts, joiner, instance, evaluation, preset } = report;
   const at = new Date(report.at);
@@ -138,7 +195,7 @@ export function reportValues(report: Report): TemplateValues {
   const kind = report.kind ?? 'join';
   // How many of this preset's instances VRCNext has seen them in, this one included — the club's
   // own history of the person, as opposed to `rejoin`, which is only about this room.
-  const events = eventCount(preset, facts.timeline, instance);
+  const events = eventCount(preset, facts.timeline, instance, facts.seenLocations);
   return {
     name: joiner.name,
     event: kind,
@@ -187,7 +244,7 @@ export function reportValues(report: Report): TemplateValues {
     trustText: facts.trust?.description,
     ranksText: ranksText(facts),
     requirementsText: requirementsText(evaluation.checks),
-    logText: activityLog(facts.timeline, LOG_LINES, (id) => facts.timelineGroups.get(id)),
+    logText: activityLog(facts.timeline, LOG_LINES, (id) => facts.timelineGroups.get(id), facts.oldestEvent),
     profileUrl: vrchatUrl('user', joiner.userId),
     userImageUrl: facts.userImageUrl,
     platform: facts.platform,
@@ -201,7 +258,7 @@ export function reportValues(report: Report): TemplateValues {
     rejoinText: rejoinText(facts),
     rejoinEmoji: triState(facts.rejoin.seenHere, '🔁', '🆕'),
     rejoinAgo: facts.rejoin.lastAt === undefined ? '' : timeAgo(facts.rejoin.lastAt),
-    rejoinSince: facts.rejoin.lastAt === undefined ? '' : new Date(facts.rejoin.lastAt).toLocaleString(),
+    rejoinSince: facts.rejoin.lastAt === undefined ? '' : discordTimestamp(facts.rejoin.lastAt),
     rejoinAt: facts.rejoin.lastAt ?? '',
     world: instance.worldName,
     worldId: instance.worldId,
@@ -213,6 +270,9 @@ export function reportValues(report: Report): TemplateValues {
       ? undefined
       : `#${instance.instanceId}${instance.instanceType === '' ? '' : ` · ${instanceTypeLabel(instance.instanceType)}`}`,
     location: instance.location,
+
+    ...profileCards(facts),
+
     time: at.toLocaleTimeString(),
     date: at.toLocaleDateString(),
     timestamp: at.toISOString(),

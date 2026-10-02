@@ -11,10 +11,14 @@
  *
  * ## What the number can see
  *
- * VRCNext's timeline is what it kept, not all of VRChat's history — it reaches back to when
- * VRCNext was installed, and the app decides how many records to answer with. So this is "the
- * nth event we know about", and it can only grow as VRCNext keeps watching. It is never wrong
- * about an instance it does see, and it never counts one twice.
+ * VRCNext's records are what it kept, not all of VRChat's history: they reach back to when
+ * VRCNext was installed. So this is "the nth event we know about", and it can only grow as
+ * VRCNext keeps watching. It is never wrong about an instance it does see, and never counts one
+ * twice.
+ *
+ * With the `sql` permission the count is over every instance in VRCNext's database. Without it,
+ * the only source is `getTimelineForUser`, which is hardcoded to **ten records** — so an
+ * ungranted club sees a number that stops climbing at ten and should read it as "at least".
  */
 
 import { instancesSeen, parseLocation, type VrcInstance, type VrcTimelineEvent } from '@vrcnext/plugin-api';
@@ -33,10 +37,16 @@ export function eventCount(
   preset: Preset,
   events: readonly VrcTimelineEvent[] | undefined,
   instance: Pick<VrcInstance, 'location' | 'worldId' | 'instanceType' | 'groupId'>,
+  seenLocations?: readonly string[],
 ): number | undefined {
-  if (events === undefined) return undefined;
+  // Every instance in the database when the club granted `sql`, and the ten-record timeline
+  // window when it did not — see the ceiling described above.
+  const places = seenLocations !== undefined
+    ? seenLocations.map((location) => parseLocation(location)).filter((place) => place.key !== '')
+    : events === undefined ? undefined : instancesSeen(events);
+  if (places === undefined) return undefined;
   const counted = new Set(
-    instancesSeen(events)
+    places
       .filter((place) => presetMatches(preset, place))
       .map((place) => place.key),
   );

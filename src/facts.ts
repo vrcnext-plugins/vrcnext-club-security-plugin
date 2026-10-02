@@ -7,7 +7,7 @@
  * parallel and each one degrades to "unknown" on its own rather than holding up the report.
  */
 
-import { TIMELINE_GAP, parseLocation, publicImageUrl, trustScore, userEventRows, type ImageSubject, type PerformanceRank, type TrustScore, type VrcInstance, type VrcTimelineEvent, type VrchatApi } from '@vrcnext/plugin-api';
+import { TIMELINE_GAP, parseLocation, publicImageUrl, trustRankLabel, trustScore, userEventRows, type ImageSubject, type PerformanceRank, type SqlApi, type TrustScore, type VrcInstance, type VrcModerations, type VrcTimelineEvent, type VrchatApi } from '@vrcnext/plugin-api';
 
 import { LOG_LINES } from './activity.js';
 import { rejoinIn, UNKNOWN_REJOIN, type Rejoin } from './history.js';
@@ -49,6 +49,46 @@ export interface Facts {
    * itself could not be read, since a score out of nothing would read as distrust.
    */
   readonly trust: TrustScore | undefined;
+
+  // The three profile cards. All of it is on the profile payload VRCNext already sends, except
+  // `dbEntries`, which is a count no payload carries.
+
+  /** VRChat's own standing word for their tags: Visitor, New User, User, Known User, Trusted. */
+  readonly trustRank: string;
+  /** How many times VRCNext has recorded meeting them, first meet included. */
+  readonly meets: number | undefined;
+  readonly firstMeetDate: string;
+  readonly lastSeen: string;
+  readonly totalTimeSeconds: number | undefined;
+  /**
+   * Rows in VRCNext's database that mention them, counted the way VRCNext selects a timeline:
+   * events they are the subject or sender of, plus every instance they were present in.
+   * `undefined` without the `sql` permission, or when the query failed.
+   */
+  readonly dbEntries: number | undefined;
+  /**
+   * Every instance VRCNext ever recorded them in, as raw locations. `undefined` without the
+   * `sql` permission, and the count then falls back to the ten-record timeline.
+   */
+  readonly seenLocations: readonly string[] | undefined;
+  /**
+   * The oldest record VRCNext holds about them, so the log's pinned last line is the real first
+   * one rather than the oldest of the ten the page returned. `undefined` without `sql`.
+   */
+  readonly oldestEvent: VrcTimelineEvent | undefined;
+  /** What *you* have done to them. Each flag `undefined` when that list was not loaded. */
+  readonly moderations: VrcModerations;
+  readonly languages: readonly string[];
+  readonly dateJoined: string;
+  readonly lastLogin: string;
+  readonly lastActivity: string;
+  readonly pronouns: string;
+  readonly status: string;
+  readonly statusDescription: string;
+  /** Your private note on them, and VRCNext's own memo. */
+  readonly note: string;
+  readonly bio: string;
+  readonly allowAvatarCopying: boolean | undefined;
 }
 
 export const UNKNOWN_FACTS: Facts = {
@@ -67,6 +107,25 @@ export const UNKNOWN_FACTS: Facts = {
   timeline: undefined,
   timelineGroups: new Map(),
   trust: undefined,
+  trustRank: '',
+  meets: undefined,
+  firstMeetDate: '',
+  lastSeen: '',
+  totalTimeSeconds: undefined,
+  dbEntries: undefined,
+  seenLocations: undefined,
+  oldestEvent: undefined,
+  moderations: { blocked: undefined, muted: undefined, chatMuted: undefined, avatarHidden: undefined, interactOff: undefined },
+  languages: [],
+  dateJoined: '',
+  lastLogin: '',
+  lastActivity: '',
+  pronouns: '',
+  status: '',
+  statusDescription: '',
+  note: '',
+  bio: '',
+  allowAvatarCopying: undefined,
 };
 
 export interface CollectOptions {
@@ -81,6 +140,14 @@ export interface CollectOptions {
   readonly extraApiRequests?: boolean;
   /** Told what each picture's address was and which one was used. */
   readonly onImages?: (note: string) => void;
+  /**
+   * Read-only SQL, for the one number the page cannot answer.
+   *
+   * reuse: `getTimelineForUser` is hardcoded to ten records (`TimelineController.cs`), so how
+   * many records exist at all is not a question any page state or push can answer at any cost.
+   * Absent when the club has not granted `sql`, and the row is then left out rather than guessed.
+   */
+  readonly sql?: SqlApi;
 }
 
 /**
@@ -256,6 +323,92 @@ async function groupNames(
   return new Map(found.filter(([, name]) => name !== ''));
 }
 
+/**
+ * How many rows in VRCNext's database mention this player.
+ *
+ * The same selection VRCNext's own timeline query uses — `ep.user_id = $uid OR e.user_id = $uid
+ * OR e.sender_id = $uid` — so the number answers "how much of this is about them", not "how many
+ * tables mention them". An unreadable database answers `undefined`, never 0: nothing recorded
+ * and nothing readable must not look alike.
+ */
+async function dbEntriesFor(sql: SqlApi | undefined, userId: string): Promise<number | undefined> {
+  if (sql === undefined) return undefined;
+  try {
+    const value = await sql.value(
+      'vrcnext',
+      'SELECT (SELECT count(*) FROM event_players WHERE user_id = ?1)'
+      + ' + (SELECT count(*) FROM events WHERE user_id = ?1 OR sender_id = ?1)',
+      [userId],
+    );
+    return typeof value === 'number' ? value : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * Every instance VRCNext has ever recorded this player in.
+ *
+ * reuse: `getTimelineForUser` answers with ten records (`TimelineController.cs`), so the page
+ * cannot count a history longer than that at any cost — a regular with sixty nights looks
+ * identical to one with ten. The selection matches VRCNext's own: records they are the subject
+ * or sender of, plus every instance they were present in.
+ *
+ * Locations, not a count, because which of them a preset watches is decided by
+ * `presetMatches` over a parsed location, and that parse lives in one place rather than being
+ * half-reimplemented in SQL. One query per joiner, shared by every preset.
+ */
+async function seenLocationsFor(sql: SqlApi | undefined, userId: string): Promise<readonly string[] | undefined> {
+  if (sql === undefined) return undefined;
+  try {
+    const rows = await sql.query(
+      'vrcnext',
+      "SELECT DISTINCT location FROM events WHERE location != ''"
+      + ' AND (user_id = ?1 OR id IN (SELECT event_id FROM event_players WHERE user_id = ?1))',
+      [userId],
+    );
+    return rows.rows.map((row) => (typeof row[0] === 'string' ? row[0] : '')).filter((l) => l !== '');
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * The oldest record VRCNext holds about this player — usually the day you met.
+ *
+ * reuse: the pinned last line of the activity log is meant to be the first thing VRCNext ever
+ * saw of them, and a ten-record window cannot reach it for anyone you have met more than ten
+ * events ago. One row, ordered in SQLite rather than in the page.
+ */
+async function oldestEventFor(sql: SqlApi | undefined, userId: string): Promise<VrcTimelineEvent | undefined> {
+  if (sql === undefined) return undefined;
+  try {
+    const rows = await sql.rows(
+      'vrcnext',
+      'SELECT id, type, timestamp, location, world_name, world_id, user_id, user_name FROM events'
+      + ' WHERE user_id = ?1 OR id IN (SELECT event_id FROM event_players WHERE user_id = ?1)'
+      + " ORDER BY timestamp ASC LIMIT 1",
+      [userId],
+    );
+    const row = rows[0];
+    if (row === undefined) return undefined;
+    const text = (key: string): string => (typeof row[key] === 'string' ? row[key] : '');
+    if (text('timestamp') === '') return undefined;
+    return {
+      id: text('id'),
+      type: text('type'),
+      timestamp: text('timestamp'),
+      location: text('location'),
+      worldName: text('world_name'),
+      worldId: text('world_id'),
+      userId: text('user_id'),
+      userName: text('user_name'),
+    };
+  } catch {
+    return undefined;
+  }
+}
+
 /** Runs every lookup in parallel and returns whatever arrived before the deadline. */
 export async function collectFacts(
   vrchat: VrchatApi,
@@ -266,11 +419,14 @@ export async function collectFacts(
   if (joiner.userId === '') return UNKNOWN_FACTS;
   const signal = AbortSignal.any([options.signal, AbortSignal.timeout(options.deadlineMs)]);
   const location = instance?.location ?? '';
-  const [user, avatar, groups, timeline] = await Promise.all([
+  const [user, avatar, groups, timeline, dbEntries, seenLocations, oldestEvent] = await Promise.all([
     vrchat.user(joiner.userId, { signal }),
     avatarFacts(vrchat, joiner, { instance, signal, note: options.onImages, extraApiRequests: options.extraApiRequests }).catch(() => undefined),
     options.wantsGroups ? vrchat.userGroups(joiner.userId, { signal }).then((g) => g.map((x) => x.id), () => undefined) : Promise.resolve(undefined),
     vrchat.userTimeline(joiner.userId, { signal }).catch(() => undefined),
+    dbEntriesFor(options.sql, joiner.userId),
+    seenLocationsFor(options.sql, joiner.userId),
+    oldestEventFor(options.sql, joiner.userId),
   ]);
   const timelineGroups = await groupNames(vrchat, timeline, signal);
   const inInstance = instance?.users.find((u) => u.id === joiner.userId);
@@ -306,6 +462,27 @@ export async function collectFacts(
     timelineGroups,
     // Badges and uploaded content are not in what VRCNext pushes, so those criteria are left
     // out of the total rather than counted as failures.
+    // reuse: every one of these is on the profile payload VRCNext already sent, and the
+    // moderation flags are read straight from the page arrays it keeps. No extra lookup.
+    trustRank: user === undefined ? '' : trustRankLabel(user.tags),
+    meets: user?.meets,
+    firstMeetDate: user?.firstMeetDate ?? '',
+    lastSeen: user?.lastSeen ?? '',
+    totalTimeSeconds: user?.totalTimeSeconds,
+    dbEntries,
+    seenLocations,
+    oldestEvent,
+    moderations: vrchat.moderations(joiner.userId),
+    languages: user?.languages ?? [],
+    dateJoined: user?.dateJoined ?? '',
+    lastLogin: user?.lastLogin ?? '',
+    lastActivity: user?.lastActivity ?? '',
+    pronouns: user?.pronouns ?? '',
+    status: user?.status ?? '',
+    statusDescription: user?.statusDescription ?? '',
+    note: user?.note ?? user?.memo ?? '',
+    bio: user?.bio ?? '',
+    allowAvatarCopying: user?.allowAvatarCopying,
     trust: user === undefined ? undefined : trustScore({
       tags: user.tags,
       dateJoined: user.dateJoined,

@@ -269,6 +269,7 @@ class ClubSecurity {
       deadlineMs,
       signal: this.#ctx.signal,
       wantsGroups: presets.some((p) => p.requiredGroup !== ''),
+      sql: this.#ctx.sql,
     });
     for (const preset of presets) {
       await this.#send({ at: Date.now(), kind: 'join', preset, joiner, instance, facts, evaluation: evaluate(preset, facts) });
@@ -313,6 +314,7 @@ class ClubSecurity {
       deadlineMs: this.#ctx.settings.get('collectTimeoutSecs') * 1000,
       signal: this.#ctx.signal,
       wantsGroups: presets.some((p) => p.requiredGroup !== ''),
+      sql: this.#ctx.sql,
     });
     for (const preset of presets) {
       if (!presetMatches(preset, instance)) {

@@ -81,3 +81,36 @@ describe('activityLog, on a record it cannot place', () => {
     expect(log).toBe('- Changed avatar <t:1790506800:R>');
   });
 });
+
+describe('the pinned oldest row', () => {
+  const window_ = [
+    { type: 'meet_again', timestamp: '2026-09-28T10:00:00Z', location: 'wrld_a:1', worldName: 'Lotus' },
+    { type: 'meet_again', timestamp: '2026-09-27T10:00:00Z', location: 'wrld_a:2', worldName: 'Lotus' },
+  ];
+  const first = { type: 'first_meet', timestamp: '2023-01-04T20:00:00Z', location: 'wrld_b:9', worldName: 'Hub' };
+
+  it('is the database’s oldest record, not the oldest of the ten the page returned', () => {
+    const withDb = activityLog(window_, 5, undefined, first).split('\n');
+    expect(withDb.at(-1)).toContain('Hub');
+
+    // And with more arrivals than rows, the gap stands between the window and that pin.
+    const busy = Array.from({ length: 12 }, (_, i) => ({
+      type: 'meet_again', timestamp: `2026-09-${String(10 + i).padStart(2, '0')}T10:00:00Z`,
+      location: `wrld_a:${String(i)}`, worldName: 'Lotus',
+    }));
+    const capped = activityLog(busy, 5, undefined, first).split('\n');
+    expect(capped).toHaveLength(5);
+    expect(capped.at(-2)).toBe('- ...');
+    expect(capped.at(-1)).toContain('Hub');
+  });
+
+  it('is only as old as the window when the database was not readable', () => {
+    expect(activityLog(window_, 5)).not.toMatch(/Hub/);
+  });
+
+  it('is not duplicated when the window already reaches that far back', () => {
+    const reaching = [...window_, first];
+    const lines = activityLog(reaching, 5, undefined, first).split('\n').filter((l) => l.includes('Hub'));
+    expect(lines).toHaveLength(1);
+  });
+});

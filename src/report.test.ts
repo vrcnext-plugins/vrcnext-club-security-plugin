@@ -1,9 +1,9 @@
 import assert from 'node:assert/strict';
 import { test } from 'vitest';
 
-import { defaultsFor, renderEmbed } from '@vrcnext/plugin-api';
+import { defaultsFor, renderEmbed, renderTemplate } from '@vrcnext/plugin-api';
 
-import type { Facts } from './facts.js';
+import { UNKNOWN_FACTS, type Facts } from './facts.js';
 import { reportLines, reportSummary, reportValues, type Report } from './report.js';
 import { evaluate } from './requirements.js';
 import { DEFAULT_EMBED, embedOf, preset as presetSchema, type Preset } from './settings.js';
@@ -11,6 +11,7 @@ import { completeEmbed } from '@vrcnext/plugin-api';
 
 function facts(overrides: Partial<Facts> = {}): Facts {
   return {
+    ...UNKNOWN_FACTS,
     ageVerified: true,
     ageVerificationStatus: '18+',
     isFriend: false,
@@ -127,8 +128,10 @@ test('the activity field is dropped when VRCNext has no history for the player',
   );
   assert.ok(withLog !== undefined);
   const logged = withLog.fields ?? [];
+  // Requirements, Avatar and Recently: the three profile cards all render empty for a fixture
+  // with no profile facts, and an empty field is dropped.
   assert.equal(logged.length, 3);
-  assert.equal(logged[2]?.value, '- Changed avatar <t:1790503200:R>');
+  assert.equal(logged.at(-1)?.value, '- Changed avatar <t:1790503200:R>');
 
   // `renderEmbed` drops a field that rendered empty, so a stranger's report is two fields.
   const without = renderEmbed(completeEmbed(DEFAULT_EMBED), reportValues(report()), { at: new Date(0) });
@@ -218,4 +221,51 @@ test('a requirement the preset does not check has no value, so a line naming it 
   ]) {
     assert.equal(values[key], undefined, `${key} should be absent, not "any"`);
   }
+});
+
+test('the three profile cards render from raw values, and a club can reword every row', () => {
+  const full = reportValues(report({}, {
+    trustRank: 'Known User',
+    meets: 14,
+    totalTimeSeconds: 18_769,
+    dbEntries: 5500,
+    moderations: { blocked: true, muted: undefined, chatMuted: false, avatarHidden: undefined, interactOff: undefined },
+    languages: ['English', 'Deutsch'],
+    pronouns: 'they/them',
+    status: 'join me',
+  }));
+
+  // The values are raw: a number is a number, a duration is VRCNext's own wording.
+  assert.equal(full['meets'], 14);
+  assert.equal(full['meetsText'], '14 times');
+  assert.equal(full['timeTogether'], '5h 12m 49s');
+  assert.equal(full['dbEntries'], 5500);
+  assert.equal(full['languages'], 'English, Deutsch');
+  assert.equal(full['trustRank'], 'Known User');
+  assert.equal(full['statusText'], 'Join Me');
+  assert.equal(full['blocked'], true);
+
+  const embed = renderEmbed(completeEmbed(DEFAULT_EMBED), full, { at: new Date(0) });
+  const by = new Map((embed?.fields ?? []).map((f) => [f.name, f.value]));
+  // No dates in this fixture: those rows render empty and vanish, which also keeps these
+  // assertions off the wall clock that `timeAgo` reads.
+  assert.equal(by.get('Activity'), 'Met: `14 times`\nTogether: `5h 12m 49s`\nRecords: `5500`');
+  const dated = reportValues(report({}, { firstMeetDate: new Date(Date.now() - 3_600_000).toISOString() }));
+  assert.equal(typeof dated['firstMetAgo'], 'string');
+  assert.match(dated['firstMetAgo'] as string, /ago$/, 'a date that is there is phrased as an interval');
+  assert.equal(by.get('Info'), 'Trust: `Known User`\nStatus: `Join Me`\nLanguages: `English, Deutsch`\nPronouns: `they/them`');
+  // Only what you actually did: `muted` is unknown and `chatMuted` is false, so neither shows.
+  assert.equal(by.get('Moderation'), '🚫 Blocked');
+
+  // A club's own wording, over the same values.
+  assert.equal(
+    renderTemplate('{name} has been met {meetsText} over {timeTogether}', full),
+    'Tupper has been met 14 times over 5h 12m 49s',
+  );
+});
+
+test('a profile VRCNext knows nothing about drops all three cards rather than saying Unknown', () => {
+  const embed = renderEmbed(completeEmbed(DEFAULT_EMBED), reportValues(report()), { at: new Date(0) });
+  const names = (embed?.fields ?? []).map((f) => f.name);
+  assert.deepEqual(names.filter((n) => ['Activity', 'Moderation', 'Info'].includes(n)), []);
 });

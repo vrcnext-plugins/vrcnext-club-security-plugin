@@ -3,12 +3,13 @@ import { test } from 'vitest';
 
 import { defaultsFor } from '@vrcnext/plugin-api';
 
-import type { Facts } from './facts.js';
+import { UNKNOWN_FACTS, type Facts } from './facts.js';
 import { AVATAR_CHECKS, evaluate, worst } from './requirements.js';
 import { preset as presetSchema, type Preset } from './settings.js';
 
 function facts(overrides: Partial<Facts> = {}): Facts {
   return {
+    ...UNKNOWN_FACTS,
     ageVerified: true,
     ageVerificationStatus: '18+',
     isFriend: true,

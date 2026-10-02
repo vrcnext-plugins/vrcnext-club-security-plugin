@@ -58,3 +58,22 @@ test("only instances the preset would have reported on count", () => {
 test('no timeline means no count, so the title says nothing rather than guessing', () => {
   assert.equal(eventCount(preset({ group: GROUP }), undefined, instance(club('111'))), undefined);
 });
+
+test('with the database behind it, the count is every instance — not the ten the page returns', () => {
+  const p = preset({ group: GROUP });
+  const here = instance(club('999'));
+
+  // What `getTimelineForUser` can answer with: ten records, so at most ten instances.
+  const timeline = Array.from({ length: 10 }, (_, i) => at('meet_again', club(String(i)), '2026-09-01T10:00:00Z'));
+  assert.equal(eventCount(p, timeline, here), 11, 'ten from the page, plus the one they are in');
+
+  // The same player, counted over every instance the database holds.
+  const seen = Array.from({ length: 41 }, (_, i) => club(String(i)));
+  assert.equal(eventCount(p, timeline, here, seen), 42);
+
+  // The preset still decides what counts: a public instance of the same world is not its event.
+  assert.equal(eventCount(p, timeline, here, [...seen, `${WORLD}:12345`]), 42);
+
+  // And the database answers even when VRCNext gave no timeline at all.
+  assert.equal(eventCount(p, undefined, here, seen), 42);
+});
