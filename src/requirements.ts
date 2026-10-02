@@ -41,6 +41,23 @@ export interface Evaluation {
 
 export const VERDICT_EMOJI: Readonly<Record<Verdict, string>> = { met: '✅', unverified: '⚠️', failed: '⛔' };
 export const VERDICT_COLOR: Readonly<Record<Verdict, string>> = { met: 'green', unverified: 'orange', failed: 'red' };
+
+/**
+ * What each check is *about*, for a surface where the verdict is already the colour.
+ *
+ * On the page a pill is coloured by its verdict, so a tick in front of it says the same thing
+ * twice and the one thing the pill cannot show — which requirement this is — has to be read from
+ * the words. These say it at a glance instead. Text surfaces keep {@link VERDICT_EMOJI}, where
+ * there is no colour to carry the verdict.
+ */
+export const CHECK_EMOJI: Readonly<Record<Check['key'], string>> = {
+  age: '🔞',
+  pcRank: '🖥️',
+  questRank: '📱',
+  group: '👥',
+  friend: '🤝',
+  trust: '🛡️',
+};
 export const VERDICT_TEXT: Readonly<Record<Verdict, string>> = {
   met: 'All requirements met',
   unverified: 'Some requirements unverified',

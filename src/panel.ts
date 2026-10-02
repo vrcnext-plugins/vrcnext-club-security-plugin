@@ -7,7 +7,7 @@ import { timeAgo, type PluginContext, type UiBadgeTone, type VrcInstance } from 
 
 import { describePreset, presetMatches } from './filters.js';
 import type { Report } from './report.js';
-import { VERDICT_EMOJI, VERDICT_TEXT, type Check, type Verdict } from './requirements.js';
+import { CHECK_EMOJI, VERDICT_TEXT, type Check, type Verdict } from './requirements.js';
 import type { Settings } from './settings.js';
 
 type Ctx = PluginContext<Settings>;
@@ -143,14 +143,15 @@ export class ReportPanel {
   /**
    * One pill per check.
    *
-   * The pill's colour is the verdict, so the words are only what was found: `PC Very Poor`,
-   * not `PC avatar rank: VeryPoor, needs Poor or better`. The emoji repeats the colour for
-   * anyone who cannot tell the two reds apart.
+   * The pill's colour is the verdict, so the words are only what was found: `PC Very Poor`, not
+   * `PC avatar rank: VeryPoor, needs Poor or better`. The emoji names the *subject* — which
+   * requirement this is — because a verdict emoji in front of a verdict-coloured pill says the
+   * same thing twice, and a row of pills is read by scanning for the one you care about.
    */
   #pills(report: Report): readonly HTMLElement[] {
     const k = this.#ctx.ui.kit;
     const pill = (check: Check): HTMLElement =>
-      k.badge(VERDICT_TONE[check.verdict], `${VERDICT_EMOJI[check.verdict]} ${check.short}`);
+      k.badge(VERDICT_TONE[check.verdict], `${CHECK_EMOJI[check.key]} ${check.short}`);
     return report.evaluation.checks.map(pill);
   }
 
@@ -158,23 +159,26 @@ export class ReportPanel {
   #rejoinPill(report: Report): HTMLElement | undefined {
     const k = this.#ctx.ui.kit;
     const { seenHere, lastAt } = report.facts.rejoin;
-    if (seenHere === false) return k.badge('neutral', 'First time here');
+    if (seenHere === false) return k.badge('neutral', '🆕 First time here');
     if (seenHere !== true) return undefined;
-    return k.badge('neutral', lastAt === undefined ? 'Seen here before' : `Seen ${timeAgo(lastAt)}`);
+    return k.badge('neutral', lastAt === undefined ? '🔁 Seen here before' : `🔁 Seen ${timeAgo(lastAt)}`);
   }
 
   /**
    * What the three pill colours mean.
    *
    * It belongs here and not in Actions: it explains the pills on the rows below it, and under
-   * the buttons it read as a status line about the button above it.
+   * the buttons it read as a status line about the button above it. Now that a pill's emoji
+   * names its subject, this is the only place the colours are spelled out — so it is also what
+   * a reader who cannot tell the two reds apart has to go on, and it says the words plainly
+   * rather than pairing them with a tick that appears nowhere else.
    */
   #legend(): HTMLElement {
     const k = this.#ctx.ui.kit;
     return k.badges(
-      k.badge('ok', `${VERDICT_EMOJI.met} all verified`),
-      k.badge('warning', `${VERDICT_EMOJI.unverified} not checkable`),
-      k.badge('err', `${VERDICT_EMOJI.failed} requirement not met`),
+      k.badge('ok', 'all verified'),
+      k.badge('warning', 'not checkable'),
+      k.badge('err', 'requirement not met'),
     );
   }
 
