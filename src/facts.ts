@@ -190,6 +190,8 @@ async function avatarFacts(vrchat: VrchatApi, joiner: Joiner, lookup: AvatarLook
       subject: { kind: 'avatar', id: avatarId },
       signal,
       refetch: lookup.extraApiRequests !== true ? undefined : async () => {
+        // reuse: the cached reply is what came back without a usable picture, so asking
+        // again is the only thing left to try. Behind the club's own `allowExtraApiRequests`.
         const fresh = await vrchat.avatar(avatarId, { signal, cached: false });
         return [
           ['refetched avatar.thumbnailImageUrl', fresh?.thumbnailImageUrl],
@@ -289,6 +291,7 @@ export async function collectFacts(
       subject: { kind: 'user', id: joiner.userId },
       signal: options.signal,
       refetch: options.extraApiRequests !== true ? undefined : async () => {
+        // reuse: same bargain as the avatar above, and behind the same setting.
         const fresh = await vrchat.user(joiner.userId, { signal: options.signal, cached: false });
         return [
           ['refetched user.currentAvatarImageUrl', fresh?.currentAvatarImageUrl],

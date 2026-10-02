@@ -43,7 +43,13 @@ class ClubSecurity {
   readonly #ctx: Ctx;
   readonly #panel: ReportPanel;
   #instance: VrcInstance | undefined;
-  /** The avatar each player here was last seen in, so a switch can be noticed on a refresh. */
+  /**
+   * The avatar each player here was last seen in, so a switch can be noticed on a refresh.
+   *
+   * reuse: nothing holds the *previous* value. VRCNext knows what everyone is wearing now, and
+   * that is all it knows — a change is the difference between two readings, so one of them has
+   * to be remembered here. Cleared on leaving an instance, and pruned to who is present.
+   */
   readonly #avatars = new Map<string, string>();
   /** Joiners currently being looked up, so a duplicate log line does not produce two reports. */
   readonly #inFlight = new Set<string>();
@@ -133,6 +139,10 @@ class ClubSecurity {
 
   async #refreshInstance(): Promise<void> {
     try {
+      // reuse: VRCNext refreshes instance info on events only — `vrcWorldJoined`, friend
+      // updates — never on a timer, so the mirror cannot notice an avatar switch inside an
+      // instance nobody left. Noticing that is the whole job of this poll, and `#syncTimer`
+      // stops it whenever neither the status card nor the avatar watch wants it.
       const instance = await this.#ctx.vrchat.currentInstance({ cached: false, signal: this.#ctx.signal });
       const previous = this.#instance;
       this.#instance = instance;
@@ -233,6 +243,8 @@ class ClubSecurity {
     if (this.#inFlight.has(key)) return;
     this.#inFlight.add(key);
     try {
+      // reuse: the poll's own answer first; this is the path where it has not run yet, and a
+      // report placed in the wrong instance is worse than one request.
       const instance = this.#instance ?? (await this.#ctx.vrchat.currentInstance({ cached: false, signal: this.#ctx.signal }));
       if (instance === undefined) {
         this.#ctx.logger.debug(`${joiner.name} joined but the current instance is not known.`);
