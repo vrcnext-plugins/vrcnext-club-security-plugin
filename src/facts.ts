@@ -337,7 +337,7 @@ async function dbEntriesFor(sql: SqlApi | undefined, userId: string): Promise<nu
     const value = await sql.value(
       'vrcnext',
       'SELECT (SELECT count(*) FROM event_players WHERE user_id = ?1)'
-      + ' + (SELECT count(*) FROM events WHERE user_id = ?1 OR sender_id = ?1)',
+      + ' + (SELECT count(*) FROM events WHERE user_id = ?1 OR sender_id = ?1) AS n',
       [userId],
     );
     return typeof value === 'number' ? value : undefined;
@@ -361,13 +361,13 @@ async function dbEntriesFor(sql: SqlApi | undefined, userId: string): Promise<nu
 async function seenLocationsFor(sql: SqlApi | undefined, userId: string): Promise<readonly string[] | undefined> {
   if (sql === undefined) return undefined;
   try {
-    const rows = await sql.query(
+    const rows = await sql.rows(
       'vrcnext',
       "SELECT DISTINCT location FROM events WHERE location != ''"
       + ' AND (user_id = ?1 OR id IN (SELECT event_id FROM event_players WHERE user_id = ?1))',
       [userId],
     );
-    return rows.rows.map((row) => (typeof row[0] === 'string' ? row[0] : '')).filter((l) => l !== '');
+    return rows.map((row) => (typeof row['location'] === 'string' ? row['location'] : '')).filter((l) => l !== '');
   } catch {
     return undefined;
   }

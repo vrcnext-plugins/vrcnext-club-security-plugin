@@ -10,7 +10,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'vitest';
 
-import type { VrchatApi } from '@vrcnext/plugin-api';
+import type { SqlApi, SqlResult, VrchatApi } from '@vrcnext/plugin-api';
 
 import { collectFacts } from './facts.js';
 
@@ -193,4 +193,55 @@ test('the note tells a club the opt-in exists, rather than only that it failed',
     notes.some((n) => n.includes('Allow making extra API requests')),
     `the log should name the switch that would help: ${notes.join(' | ')}`,
   );
+});
+
+test('the database answers what the page cannot: records, every instance, the first one', async () => {
+  // The shape the bridge really sends: rows are objects keyed by column name.
+  const asked: string[] = [];
+  const query = (statement: string): SqlResult => {
+    asked.push(statement);
+    if (statement.includes('DISTINCT location')) {
+      return { columns: ['location'], rows: [{ location: 'wrld_a:1' }, { location: 'wrld_a:2' }] };
+    }
+    if (statement.includes('ORDER BY timestamp ASC')) {
+      return {
+        columns: ['id', 'type', 'timestamp', 'location', 'world_name', 'world_id', 'user_id', 'user_name'],
+        rows: [{ id: 'e1', type: 'first_meet', timestamp: '2022-01-04T18:26:02.000Z', location: 'wrld_z:9', world_name: 'Virtual Apartment', world_id: 'wrld_z', user_id: 'usr_1', user_name: 'Joiner' }],
+      };
+    }
+    return { columns: ['n'], rows: [{ n: 11_333 }] };
+  };
+  const sql: SqlApi = {
+    query: (_db, statement) => Promise.resolve(query(statement)),
+    rows: (_db, statement) => Promise.resolve(query(statement).rows),
+    value: (_db, statement) => {
+      const result = query(statement);
+      const first = result.columns[0];
+      return Promise.resolve(first === undefined ? undefined : result.rows[0]?.[first]);
+    },
+    databases: () => Promise.resolve([]),
+  };
+
+  const facts = await collectFacts(vrchat({}), { name: 'Joiner', userId: 'usr_1' }, undefined, {
+    deadlineMs: 1000,
+    signal: new AbortController().signal,
+    wantsGroups: false,
+    sql,
+  });
+
+  assert.equal(facts.dbEntries, 11_333);
+  assert.deepEqual(facts.seenLocations, ['wrld_a:1', 'wrld_a:2']);
+  assert.equal(facts.oldestEvent?.worldName, 'Virtual Apartment');
+  assert.equal(facts.oldestEvent.type, 'first_meet');
+});
+
+test('without the sql permission those three are undefined, never a guess at zero', async () => {
+  const facts = await collectFacts(vrchat({}), { name: 'Joiner', userId: 'usr_1' }, undefined, {
+    deadlineMs: 1000,
+    signal: new AbortController().signal,
+    wantsGroups: false,
+  });
+  assert.equal(facts.dbEntries, undefined);
+  assert.equal(facts.seenLocations, undefined);
+  assert.equal(facts.oldestEvent, undefined);
 });
