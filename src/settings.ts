@@ -6,7 +6,7 @@
  * each with its own template or embed). The three numbers at the bottom are global.
  */
 
-import { INSTANCE_TYPES, PERFORMANCE_RANKS, completeEmbed, instanceTypeLabel, type EmbedTemplate, type SettingVariables, type SettingsSchema, type SettingsValues } from '@vrcnext/plugin-api';
+import { INSTANCE_TYPES, PERFORMANCE_RANKS, completeEmbed, instanceTypeOptionLabel, type EmbedTemplate, type SettingVariables, type SettingsSchema, type SettingsValues } from '@vrcnext/plugin-api';
 
 /** The report as text: first line = title, rest = body. Used for toasts, desktop and VR. */
 export const DEFAULT_TEMPLATE = [
@@ -39,14 +39,17 @@ export const DEFAULT_EMBED = {
   // whose subject is already named twice.
   // Quoted, because a display name is arbitrary text: `Bluscream joined` reads as a sentence,
   // while `now joined` or `🎧 DJ joined` does not, and the quotes make the boundary obvious.
-  title: '"{name}" {eventText}',
+  // The count is the club's own history of the person, which "rejoined" does not carry: a
+  // player can be new to this room and known at the door. Conditional, because a title that
+  // says "the 1st event" to someone's hundredth visit is worse than one that does not count.
+  title: '"{name}" {eventText}{{ " for the " + eventOrdinal + " event" if eventOrdinal else "" }}',
   authorName: '{userId}',
   authorUrl: '{profileUrl}',
   authorIconUrl: '{userImageUrl}',
   color: '{resultColor}',
   thumbnailUrl: '{avatarImageUrl}',
   footerIconUrl: 'https://vrcnext.com/logo.png',
-  footerText: 'VRCNext Club Security · {preset}{{ " · " + world if world else "" }}{{ " · " + instanceName if instanceName else "" }}',
+  footerText: 'VRCNext · {preset}{{ " · " + world if world else "" }}{{ " · " + instanceName if instanceName else "" }}',
   timestamp: true,
   fields: [
     { name: 'Requirements', value: '{requirementsText}', inline: true },
@@ -76,6 +79,8 @@ export const TEMPLATE_VARIABLES = {
   presetRequiredTrustScore: 'The trust score floor this preset asks for, e.g. 75%',
   event: 'join or avatar',
   eventText: '"joined" or "switched avatar"',
+  eventCount: "How many of this preset's instances VRCNext has seen them in, this one included",
+  eventOrdinal: 'The same as 1st, 2nd, 3rd — empty when VRCNext has no history of them',
   result: 'met, unverified or failed',
   resultText: 'The verdict in words',
   resultEmoji: '✅, ⚠️ or ⛔',
@@ -164,8 +169,10 @@ const RANK_OPTIONS = [
   ...[...PERFORMANCE_RANKS].reverse().map((rank) => ({ value: rank, label: `${rank} or better` })),
 ] as const;
 
-// The app's own names for the types, so a preset reads the way VRCNext's instance badges do.
-const INSTANCE_TYPE_OPTIONS = INSTANCE_TYPES.map((type) => ({ value: type, label: instanceTypeLabel(type) }));
+// The app's own names for the types, so a preset reads the way VRCNext's instance badges do —
+// disambiguated, because a badge names one instance while this list offers all nine at once and
+// two of them are both badged "Friends+".
+const INSTANCE_TYPE_OPTIONS = INSTANCE_TYPES.map((type) => ({ value: type, label: instanceTypeOptionLabel(type) }));
 
 /** One club. */
 export const preset = {

@@ -18,7 +18,7 @@ describe('activityLog', () => {
       event('friend_avatar', '2026-09-27T11:00:00Z'),
     ]);
     expect(log.split('\n')).toEqual([
-      '- Visited `DragonZ Lotus` #12345 (Group Public) <t:1790510400:R>',
+      '- Visited `DragonZ Lotus #12345` (Group Public) <t:1790510400:R>',
       '- Changed avatar <t:1790506800:R>',
       '- Came online <t:1790503200:R>',
     ]);
@@ -37,7 +37,7 @@ describe('activityLog', () => {
       event('instance_join', '2026-09-27T12:00:00Z', LOTUS, 'DragonZ Lotus'),
       event('instance_join', '2026-09-27T11:00:00Z', LOTUS, 'DragonZ Lotus'),
     ], 5, (id) => (id === 'grp_x' ? 'Lotus Crew' : undefined));
-    expect(log).toBe('- Visited `DragonZ Lotus` #12345 by `Lotus Crew` (Group Public) ×2 <t:1790510400:R>');
+    expect(log).toBe('- Visited `DragonZ Lotus #12345` by `Lotus Crew` (Group Public) ×2 <t:1790510400:R>');
   });
 
   it('says what a moderation record actually was', () => {

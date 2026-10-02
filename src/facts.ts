@@ -7,8 +7,9 @@
  * parallel and each one degrades to "unknown" on its own rather than holding up the report.
  */
 
-import { parseLocation, publicImageUrl, recentUserEvents, trustScore, type ImageSubject, type PerformanceRank, type TrustScore, type VrcInstance, type VrcTimelineEvent, type VrchatApi } from '@vrcnext/plugin-api';
+import { TIMELINE_GAP, parseLocation, publicImageUrl, trustScore, userEventRows, type ImageSubject, type PerformanceRank, type TrustScore, type VrcInstance, type VrcTimelineEvent, type VrchatApi } from '@vrcnext/plugin-api';
 
+import { LOG_LINES } from './activity.js';
 import { rejoinIn, UNKNOWN_REJOIN, type Rejoin } from './history.js';
 
 export interface Joiner {
@@ -224,8 +225,9 @@ export async function collectAvatarFacts(
 /**
  * Names for the groups the log will mention, looked up after the timeline is in.
  *
- * Bounded on purpose: only the instances that survive deduplication into the visible lines can
- * need a name, and a report is not worth a dozen group lookups. A lookup that fails leaves the
+ * Bounded on purpose, and bounded by the same call the log itself makes: only the instances
+ * that survive deduplication into the rows that get printed can need a name, the pinned oldest
+ * one included, and a report is not worth a dozen group lookups. A lookup that fails leaves the
  * line without the "by …" part rather than holding up the report.
  */
 async function groupNames(
@@ -234,8 +236,9 @@ async function groupNames(
   signal: AbortSignal,
 ): Promise<ReadonlyMap<string, string>> {
   const ids = [...new Set(
-    recentUserEvents(timeline)
-      .map((entry) => parseLocation(entry.event.location).groupId)
+    userEventRows(timeline, { limit: LOG_LINES, oldest: true })
+      .filter((row) => row !== TIMELINE_GAP)
+      .map((row) => parseLocation(row.event.location).groupId)
       .filter((id) => id !== ''),
   )];
   const found = await Promise.all(ids.map(async (id) => {

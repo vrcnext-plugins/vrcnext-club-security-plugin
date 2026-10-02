@@ -75,7 +75,7 @@ test('the default embed renders with the verdict colour and the avatar thumbnail
   });
   assert.equal(embed.color, 0x3ba55d);
   assert.deepEqual(embed.thumbnail, { url: 'https://img.test/a.png' });
-  assert.equal(embed.footer?.text, 'VRCNext Club Security · Club · The Club · #1 · Group Public');
+  assert.equal(embed.footer?.text, 'VRCNext · Club · The Club · #1 · Group Public');
 });
 
 test('the embed puts the requirements and the avatar side by side', () => {

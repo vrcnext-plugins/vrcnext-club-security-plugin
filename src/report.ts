@@ -9,6 +9,7 @@
 import {
   TemplateError,
   instanceTypeLabel,
+  ordinal,
   rankEmoji,
   rankLabel,
   renderTemplate,
@@ -19,6 +20,7 @@ import {
 } from '@vrcnext/plugin-api';
 
 import { activityLog, LOG_LINES } from './activity.js';
+import { eventCount } from './events.js';
 import type { Facts, Joiner } from './facts.js';
 import { VERDICT_COLOR, VERDICT_EMOJI, VERDICT_TEXT, type Evaluation } from './requirements.js';
 import { DEFAULT_TEMPLATE, type Preset } from './settings.js';
@@ -92,6 +94,24 @@ function rejoinText(facts: Facts): string {
   return lastAt === undefined ? 'Yes' : `Yes (${timeAgo(lastAt)})`;
 }
 
+/**
+ * What the preset asked for, as opposed to what the joiner turned out to be.
+ *
+ * A requirement the preset does not check is `undefined` rather than "any", so a template line
+ * naming one is dropped instead of printing a floor nobody set.
+ */
+function presetWants(preset: Preset): TemplateValues {
+  return {
+    presetRequiredAge: preset.requireAge ? '18+' : undefined,
+    presetRequiredFriend: preset.requireFriend ? 'Friend' : undefined,
+    presetRequiredPcRank: preset.minPcRank === 'any' ? undefined : rankLabel(preset.minPcRank),
+    presetRequiredQuestRank: preset.minQuestRank === 'any' ? undefined : rankLabel(preset.minQuestRank),
+    presetRequiredGroup: preset.requiredGroup === '' ? undefined : preset.requiredGroup,
+    // Zero is "any", the same bargain `evaluate` makes when it leaves the check out entirely.
+    presetRequiredTrustScore: preset.minTrustScore > 0 ? `${String(preset.minTrustScore)}%` : undefined,
+  };
+}
+
 /** Everything a template may name. `undefined` means "not applicable", which drops the line. */
 export function reportValues(report: Report): TemplateValues {
   const { facts, joiner, instance, evaluation, preset } = report;
@@ -104,22 +124,18 @@ export function reportValues(report: Report): TemplateValues {
   const failed = evaluation.checks.filter((c) => c.verdict === 'failed');
   const unverified = evaluation.checks.filter((c) => c.verdict === 'unverified');
   const kind = report.kind ?? 'join';
+  // How many of this preset's instances VRCNext has seen them in, this one included — the club's
+  // own history of the person, as opposed to `rejoin`, which is only about this room.
+  const events = eventCount(preset, facts.timeline, instance);
   return {
     name: joiner.name,
     event: kind,
+    eventCount: events,
+    eventOrdinal: events === undefined || events < 1 ? undefined : ordinal(events),
     eventText: kind === 'avatar' ? 'switched avatar' : facts.rejoin.seenHere === true ? 'rejoined' : 'joined',
     userId: joiner.userId,
     preset: preset.name,
-    // What the preset asked for, as opposed to what the joiner turned out to be. A requirement the
-    // preset does not check is `undefined` rather than "any", so a template line naming one is
-    // dropped instead of printing a floor nobody set.
-    presetRequiredAge: preset.requireAge ? '18+' : undefined,
-    presetRequiredFriend: preset.requireFriend ? 'Friend' : undefined,
-    presetRequiredPcRank: preset.minPcRank === 'any' ? undefined : rankLabel(preset.minPcRank),
-    presetRequiredQuestRank: preset.minQuestRank === 'any' ? undefined : rankLabel(preset.minQuestRank),
-    presetRequiredGroup: preset.requiredGroup === '' ? undefined : preset.requiredGroup,
-    // Zero is "any", the same bargain `evaluate` makes when it leaves the check out entirely.
-    presetRequiredTrustScore: preset.minTrustScore > 0 ? `${String(preset.minTrustScore)}%` : undefined,
+    ...presetWants(preset),
     result: evaluation.verdict,
     resultText: VERDICT_TEXT[evaluation.verdict],
     resultEmoji: VERDICT_EMOJI[evaluation.verdict],
