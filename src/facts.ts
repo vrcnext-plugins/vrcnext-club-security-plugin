@@ -223,11 +223,15 @@ export async function collectAvatarFacts(
 }
 
 /**
- * Names for the groups the log will mention, looked up after the timeline is in.
+ * Names for the groups the log will mention.
  *
- * Bounded on purpose, and bounded by the same call the log itself makes: only the instances
- * that survive deduplication into the rows that get printed can need a name, the pinned oldest
- * one included, and a report is not worth a dozen group lookups. A lookup that fails leaves the
+ * Mostly free: VRCNext caches the name of every group its own screens have shown, so
+ * `vrchat.name` answers without a request for the clubs the user actually goes to. Only the
+ * ones it has never resolved cost a lookup.
+ *
+ * Bounded twice over — by the same call the log itself makes, so only the instances that
+ * survive deduplication into the rows that get printed can need a name, the pinned oldest one
+ * included, and a report is not worth a dozen group lookups. A lookup that fails leaves the
  * line without the "by …" part rather than holding up the report.
  */
 async function groupNames(
@@ -242,6 +246,8 @@ async function groupNames(
       .filter((id) => id !== ''),
   )];
   const found = await Promise.all(ids.map(async (id) => {
+    const known = vrchat.name('group', id);
+    if (known !== undefined) return [id, known] as const;
     const group = await vrchat.group(id, { signal }).catch(() => undefined);
     return [id, group?.name ?? ''] as const;
   }));

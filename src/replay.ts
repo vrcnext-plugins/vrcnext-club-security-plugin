@@ -62,6 +62,18 @@ export const EXAMPLE_INSTANCE = instanceFrom(
 );
 
 /**
+ * What the world is called, without asking VRChat.
+ *
+ * Only the name is wanted, and VRCNext has cached the name of every world its own screens have
+ * shown — which, for a world the user was just standing in, it has. The record's own
+ * `worldName` is the fallback, and both can be empty: a test report naming no world is better
+ * than one that spent a request to name it.
+ */
+function worldName(vrchat: VrchatApi, where: { readonly location: string; readonly worldName: string }): string {
+  return vrchat.name('world', parseLocation(where.location).worldId) ?? where.worldName;
+}
+
+/**
  * You, and where you last were — for "how would this preset treat me?".
  *
  * Every filter the real path applies to you is deliberately skipped by the caller: the point is
@@ -84,8 +96,7 @@ export async function selfCheck(options: ReplayOptions): Promise<Replay | undefi
   const timeline = await vrchat.userTimeline(me.id, { signal }).catch(() => []);
   const where = lastLocation(timeline);
   if (where === undefined) return { joiner, instance: EXAMPLE_INSTANCE, located: false };
-  const world = await vrchat.world(parseLocation(where.location).worldId, { signal }).catch(() => undefined);
-  return { joiner, instance: instanceFrom(where.location, world?.name ?? where.worldName), located: true };
+  return { joiner, instance: instanceFrom(where.location, worldName(vrchat, where)), located: true };
 }
 
 /**
@@ -106,6 +117,5 @@ export async function lastJoin(options: ReplayOptions): Promise<Replay | undefin
   const timeline = await vrchat.userTimeline(player.id, { signal }).catch(() => []);
   const where = lastLocation(timeline);
   if (where === undefined) return { joiner, instance: instanceFrom('', ''), located: false };
-  const world = await vrchat.world(parseLocation(where.location).worldId, { signal }).catch(() => undefined);
-  return { joiner, instance: instanceFrom(where.location, world?.name ?? where.worldName), located: true };
+  return { joiner, instance: instanceFrom(where.location, worldName(vrchat, where)), located: true };
 }

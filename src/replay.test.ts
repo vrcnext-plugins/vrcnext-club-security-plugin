@@ -30,7 +30,8 @@ function vrchat(self: { id: string; displayName: string } | undefined, timeline:
   return {
     self: () => self,
     userTimeline: () => Promise.resolve(timeline),
-    world: () => Promise.resolve(undefined),
+    // Nothing cached, so the fallback is the record's own world name — no request made.
+    name: () => undefined,
   } as unknown as VrchatApi;
 }
 
