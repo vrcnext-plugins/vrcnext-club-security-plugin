@@ -75,9 +75,9 @@ class ClubSecurity {
    *
    * What is reliable is the burst's own shape: thirty-six lines inside two seconds, then
    * nothing. So arriving in a world only *arms* this, and the first join afterwards starts the
-   * window — however long the world took to load.
+   * span — however long the world took to load.
    *
-   * Timed on the entries' timestamps rather than `Date.now()`, because the window has to mean
+   * Timed on the entries' timestamps rather than `Date.now()`, because the span has to mean
    * "when VRChat logged it", not "when VRCNext got around to reading the file".
    */
   #armed = false;
@@ -251,7 +251,7 @@ class ClubSecurity {
   /**
    * Whether this join is one of the ones that were already here.
    *
-   * Arms on the way past: the first join after arriving opens the window, and every join inside
+   * Arms on the way past: the first join after arriving opens the span, and every join inside
    * it is part of the same burst.
    */
   #isArrivalBurst(at: number): boolean {
