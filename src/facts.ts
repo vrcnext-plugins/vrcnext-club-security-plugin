@@ -460,7 +460,7 @@ export async function collectFacts(
     }, options.onImages),
     ...(avatar ?? { avatarId: '', avatarName: '', avatarImageUrl: '', pcRank: '', questRank: '', iosRank: '' }),
     groupIds: groups,
-    rejoin: location === '' ? UNKNOWN_REJOIN : rejoinIn(timeline, location),
+    rejoin: location === '' ? UNKNOWN_REJOIN : rejoinIn(timeline, location, joiner.userId),
     timeline,
     timelineGroups,
     // Badges and uploaded content are not in what VRCNext pushes, so those criteria are left

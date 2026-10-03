@@ -43,3 +43,50 @@ test('the same world in another instance, or nothing at all, is not a rejoin', (
 test('no answer from VRCNext is unknown, not no', () => {
   assert.equal(rejoinIn(undefined, HERE).seenHere, undefined);
 });
+
+const THEM = 'usr_45d5c503-0783-4bf7-a01a-d26007200aea';
+
+test('sessions settle a rejoin the records alone cannot see', () => {
+  // Deahtpink in Fjord Party Club #43154 on 2026-10-03, straight out of VRCNext's database.
+  // Two events, both in this instance and nothing anywhere else between them and now, so the
+  // records read as one unbroken visit and the report said "joined". The session list on the
+  // `instance_join` says otherwise: here 21:51–22:47, gone thirteen minutes, back at 23:00.
+  const events = [
+    { timestamp: '2026-10-03T21:51:36Z', location: HERE },
+    {
+      timestamp: '2026-10-03T21:10:14Z',
+      location: HERE,
+      players: [{
+        userId: THEM,
+        displayName: 'Deahtpink',
+        joinedAts: ['2026-10-03T21:51:36Z', '2026-10-03T23:00:53Z'],
+        leftAts: ['2026-10-03T22:47:17Z', '2026-10-03T23:02:53Z'],
+      }],
+    },
+  ];
+  assert.equal(rejoinIn(events, HERE).seenHere, false, 'without the user id there is nothing to look up');
+  const r = rejoinIn(events, HERE, THEM);
+  assert.equal(r.seenHere, true);
+  assert.equal(r.lastAt, '2026-10-03T21:51:36Z', 'the visit they came back from, not this one');
+});
+
+test('one session in this instance is a first visit, whatever the records look like', () => {
+  const r = rejoinIn([{
+    timestamp: '2026-10-03T21:10:14Z',
+    location: HERE,
+    players: [{ userId: THEM, displayName: 'Deahtpink', joinedAts: ['2026-10-03T21:51:36Z'], leftAts: [] }],
+  }], HERE, THEM);
+  assert.equal(r.seenHere, false);
+  assert.equal(r.lastAt, undefined);
+});
+
+test('sessions for someone else are not an answer about this player', () => {
+  // Falls through to the records, which do show a visit they came back from.
+  const r = rejoinIn([
+    { timestamp: '2026-09-27T11:59:58Z', location: HERE, players: [{ userId: 'usr_other', displayName: 'Someone', joinedAts: ['2026-09-27T11:00:00Z', '2026-09-27T11:59:58Z'], leftAts: [] }] },
+    { timestamp: '2026-09-27T10:00:00Z', location: SAME_WORLD_OTHER_INSTANCE },
+    { timestamp: '2026-09-20T20:00:00Z', location: HERE },
+  ], HERE, THEM);
+  assert.equal(r.seenHere, true);
+  assert.equal(r.lastAt, '2026-09-20T20:00:00Z');
+});
