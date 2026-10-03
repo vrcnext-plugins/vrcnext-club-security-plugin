@@ -22,6 +22,10 @@ export const DEFAULT_TEMPLATE_VR = [
   '{checksPlainText}',
 ].join('\n');
 
+/** The title with the club's own count of the person, and the same title without it. */
+const TITLE_WITH_COUNT = '"{name}" {eventText}{{ " for the " + eventOrdinal + " time" if eventOrdinal else "" }}';
+const TITLE_PLAIN = '"{name}" {eventText}';
+
 /**
  * The report as a Discord embed.
  *
@@ -42,7 +46,7 @@ export const DEFAULT_EMBED = {
   // The count is the club's own history of the person, which "rejoined" does not carry: a
   // player can be new to this room and known at the door. Conditional, because a title that
   // says "the 1st event" to someone's hundredth visit is worse than one that does not count.
-  title: '"{name}" {eventText}{{ " for the " + eventOrdinal + " event" if eventOrdinal else "" }}',
+  title: TITLE_WITH_COUNT,
   authorName: '{userId}',
   authorUrl: '{profileUrl}',
   authorIconUrl: '{userImageUrl}',
@@ -227,7 +231,13 @@ export function embedOf(preset: Preset): EmbedTemplate {
   if (preset.discord.useCustomEmbed) return preset.discord.embed;
   const base = completeEmbed(DEFAULT_EMBED);
   const off = new Set<string>(OPTIONAL_FIELDS.filter(([, key]) => !preset.discord[key]).map(([name]) => name));
-  return off.size === 0 ? base : { ...base, fields: base.fields.filter((field) => !off.has(field.name)) };
+  return {
+    ...base,
+    // Not `{eventOrdinal}` left empty: the count is a whole clause, and a title that reads
+    // `"Name" joined for the  ` is worse than one that never counted.
+    ...(preset.discord.showEventCount ? {} : { title: TITLE_PLAIN }),
+    ...(off.size === 0 ? {} : { fields: base.fields.filter((field) => !off.has(field.name)) }),
+  };
 }
 
 /**
@@ -415,6 +425,13 @@ export const preset = {
         kind: 'boolean',
         label: 'Add the Info field',
         description: 'Trust rank, status, languages, pronouns and when they joined VRChat.',
+        default: true,
+        hidden: (values) => values['useCustomEmbed'] === true,
+      },
+      showEventCount: {
+        kind: 'boolean',
+        label: 'Count the person in the title',
+        description: 'Adds "for the 5th time" — how many of this preset\'s instances VRCNext has seen them in. Empty on someone it has no history of, so the title never claims a hundredth visit is the first.',
         default: true,
         hidden: (values) => values['useCustomEmbed'] === true,
       },

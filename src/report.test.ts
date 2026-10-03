@@ -70,7 +70,7 @@ test('the title counts the preset\'s own history of them, and says nothing witho
     ],
     rejoin: { seenHere: true, lastAt: '2026-09-20T12:00:00Z' },
   });
-  assert.equal(title(seen), '"Tupper" rejoined for the 2nd event',
+  assert.equal(title(seen), '"Tupper" rejoined for the 2nd time',
     'one instance in the history plus the one they are in now');
 });
 
@@ -299,4 +299,19 @@ test('the Avatar field lists every platform the avatar is built for, iOS include
   // An avatar with no iOS build drops that line rather than printing an unknown.
   const noIos = reportValues(report({}, { avatarName: 'Ava', pcRank: 'Good', questRank: '', iosRank: '' }));
   assert.equal(noIos['ranksText'], '- 🖥️ PC: 🔵 Good');
+});
+
+test('the count in the title is a switch, and nothing on a custom embed', () => {
+  const defaults = defaultsFor(presetSchema);
+  assert.match(embedOf(defaults).title, /eventOrdinal/, 'counted out of the box');
+
+  // Not the variable left empty: the count is a whole clause, trailing space and all.
+  const off: Preset = { ...defaults, discord: { ...defaults.discord, showEventCount: false } };
+  assert.equal(embedOf(off).title, '"{name}" {eventText}');
+
+  const custom: Preset = {
+    ...off,
+    discord: { ...off.discord, useCustomEmbed: true, embed: completeEmbed(DEFAULT_EMBED) },
+  };
+  assert.match(embedOf(custom).title, /eventOrdinal/);
 });
