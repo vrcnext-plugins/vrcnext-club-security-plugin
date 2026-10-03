@@ -443,8 +443,10 @@ export const settings = {
   },
   settleSecs: {
     kind: 'number',
-    label: 'Seconds to ignore after you join',
-    description: 'VRChat logs a join for everyone already there when you enter. Joins inside this settling time are not reported.',
+    label: 'Seconds the arrival burst may last',
+    description:
+      'VRChat logs a join for everyone already there once the world finishes loading, all at once. '
+      + 'This is how long that burst is allowed to run — it is measured from the first join after you arrive, not from when you arrived, so a slow world does not spend it loading.',
     default: 15,
     min: 3,
     max: 120,

@@ -22,6 +22,17 @@ import { settings, type Preset } from './src/settings.js';
 
 type Ctx = PluginContext<typeof settings>;
 
+/**
+ * A game-log entry's timestamp in milliseconds, falling back to now.
+ *
+ * VRCNext writes `yyyy-MM-ddTHH:mm:ss` with no zone, which is local time to `Date.parse` — the
+ * same clock the fallback uses, so the two are comparable either way.
+ */
+function logTime(timestamp: string): number {
+  const parsed = Date.parse(timestamp);
+  return Number.isNaN(parsed) ? Date.now() : parsed;
+}
+
 /** VRCNext's parsed game-log kinds for `[Behaviour] OnPlayerJoined` and `Joining wrld_…`. */
 const JOIN_EVENT = 'gl_player_join';
 const WORLD_JOIN_EVENT = 'gl_world_join';
@@ -54,10 +65,24 @@ class ClubSecurity {
   /** Joiners currently being looked up, so a duplicate log line does not produce two reports. */
   readonly #inFlight = new Set<string>();
   /**
-   * Until when joins count as "already here". VRChat logs an `OnPlayerJoined` for every player
-   * present when the local player arrives, in one burst right after the local player's own line.
+   * The arrival burst, as the game log's own clock sees it.
+   *
+   * VRChat logs an `OnPlayerJoined` for every player already present when you arrive. It does
+   * *not* log them "right after" entering the room: the burst comes when the world has finished
+   * loading, which on a club world full of people was measured at eighteen seconds after
+   * `Entering Room:` — past any sane settling time counted from there. The local player's own
+   * line is no help either; it is in the middle of that burst, not in front of it.
+   *
+   * What is reliable is the burst's own shape: thirty-six lines inside two seconds, then
+   * nothing. So arriving in a world only *arms* this, and the first join afterwards starts the
+   * window — however long the world took to load.
+   *
+   * Timed on the entries' timestamps rather than `Date.now()`, because the window has to mean
+   * "when VRChat logged it", not "when VRCNext got around to reading the file".
    */
-  #settledAt = 0;
+  #armed = false;
+  /** The end of the burst in game-log time, or 0 when no burst is running. */
+  #burstEndsAt = 0;
   /** Set while the plugin's tab is the one on screen; the host tells us when that changes. */
   #panelVisible = false;
   #timer: ReturnType<typeof setInterval> | undefined;
@@ -82,7 +107,7 @@ class ClubSecurity {
       void this.#followArrival();
     });
     this.#ctx.gameLog.onType(JOIN_EVENT, (entry) => {
-      void this.#onJoin({ name: entry.message, userId: entry.detail });
+      void this.#onJoin({ name: entry.message, userId: entry.detail }, logTime(entry.timestamp));
     });
     this.#panel.install();
     void this.#refreshInstance();
@@ -219,7 +244,27 @@ class ClubSecurity {
   }
 
   #startSettling(): void {
-    this.#settledAt = Date.now() + this.#ctx.settings.get('settleSecs') * 1000;
+    this.#armed = true;
+    this.#burstEndsAt = 0;
+  }
+
+  /**
+   * Whether this join is one of the ones that were already here.
+   *
+   * Arms on the way past: the first join after arriving opens the window, and every join inside
+   * it is part of the same burst.
+   */
+  #isArrivalBurst(at: number): boolean {
+    if (this.#burstEndsAt !== 0) {
+      if (at <= this.#burstEndsAt) return true;
+      this.#burstEndsAt = 0;
+      this.#armed = false;
+      return false;
+    }
+    if (!this.#armed) return false;
+    this.#armed = false;
+    this.#burstEndsAt = at + this.#ctx.settings.get('settleSecs') * 1000;
+    return true;
   }
 
   #isSelf(joiner: Joiner): boolean {
@@ -228,13 +273,16 @@ class ClubSecurity {
     return joiner.userId !== '' ? joiner.userId === me.id : joiner.name === me.displayName;
   }
 
-  async #onJoin(joiner: Joiner): Promise<void> {
+  async #onJoin(joiner: Joiner, at: number): Promise<void> {
     if (joiner.name === '') return;
+    // Your own line sits inside the burst, so it arms rather than delimits — it is the one
+    // signal left when the plugin started after `Entering Room:` had already gone by.
     if (this.#isSelf(joiner)) {
-      this.#startSettling();
+      if (this.#burstEndsAt === 0) this.#startSettling();
+      this.#isArrivalBurst(at);
       return;
     }
-    if (Date.now() < this.#settledAt) {
+    if (this.#isArrivalBurst(at)) {
       // VRCNext records the meeting itself, so nothing is lost by not reporting it.
       this.#ctx.logger.debug(`${joiner.name} was already here when you joined; not reported.`);
       return;
