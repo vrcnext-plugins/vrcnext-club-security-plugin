@@ -53,7 +53,7 @@ test('a membership that is not shown cannot be called a failure', () => {
   assert.equal(result.verdict, 'unverified');
   assert.equal(evaluate(preset({ requiredGroup: 'grp_a' }), facts()).verdict, 'met', 'case-insensitive');
   const unknown = evaluate(preset({ requiredGroup: 'grp_a' }), facts({ groupIds: undefined }));
-  assert.equal(unknown.checks.find((c) => c.key === 'group')?.detail, 'groups unknown');
+  assert.equal(unknown.checks.find((c) => c.key === 'group')?.detail, 'unknown');
 });
 
 test('a preset with no requirements is met, and the worst verdict wins', () => {

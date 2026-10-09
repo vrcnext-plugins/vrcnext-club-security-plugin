@@ -112,7 +112,7 @@ test('the embed puts the requirements and the avatar side by side', () => {
   // A check that passed says so with a tick; one that did not carries the reason, in bold.
   assert.equal(
     requirements.value,
-    '18+ verified: ✅\nPC avatar rank: ⛔ **VeryPoor, needs Medium or better**\nGroup member: ⚠️ **groups unknown**',
+    '18+ verified: ✅\nPC avatar rank: ⛔ **VeryPoor, needs Medium or better**\nGroup member: ⚠️ **unknown**',
   );
   assert.equal(requirements.inline, true);
   assert.equal(avatar.value, '["Ava"](https://vrchat.com/home/avatar/avtr_1)\n- 🖥️ PC: 🔴 Very Poor\n- 📱 Quest: 🟠 Poor');

@@ -101,7 +101,8 @@ function rankCheck(key: 'pcRank' | 'questRank' | 'iosRank', label: string, rank:
 function groupCheck(facts: Facts, groupId: string): Check {
   const label = 'Group member';
   if (facts.groupIds === undefined) {
-    return { key: 'group', label, short: 'Group unknown', verdict: 'unverified', detail: 'groups unknown' };
+    // `unknown` for the same reason as the rank checks: the label already names the subject.
+    return { key: 'group', label, short: 'Group unknown', verdict: 'unverified', detail: 'unknown' };
   }
   const member = facts.groupIds.some((id) => id.toLowerCase() === groupId.toLowerCase());
   return member
