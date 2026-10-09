@@ -14,7 +14,7 @@
 
 import { EMBED_LIMITS, discordTimestamp, fitLines, type VrcTimelineEvent } from '@vrcnext/plugin-api';
 
-/** One name, with the window VRCNext saw it in. */
+/** One name, with the span VRCNext saw it in. */
 export interface SeenName {
   readonly name: string;
   /** When it was first recorded, as an ISO timestamp. */

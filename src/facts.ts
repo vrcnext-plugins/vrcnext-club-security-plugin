@@ -161,7 +161,7 @@ export interface CollectOptions {
   /** Told what each picture's address was and which one was used. */
   readonly onImages?: (note: string) => void;
   /**
-   * Read-only SQL, for the facts the page is holding only a window of.
+   * Read-only SQL, for the facts the page is holding only a slice of.
    *
    * reuse: `getTimelineForUser` is hardcoded to ten records (`TimelineController.cs`), so how
    * many records exist at all, which instance was the first, and every name a player has gone by
