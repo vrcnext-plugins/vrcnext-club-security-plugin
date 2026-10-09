@@ -19,6 +19,8 @@ const VERDICT_TONE: Readonly<Record<Verdict, UiBadgeTone>> = { met: 'ok', unveri
 export interface PanelDeps {
   readonly currentInstance: () => VrcInstance | undefined;
   readonly sendTest: () => Promise<void>;
+  /** The last recorded player, reported as an avatar switch rather than a join. */
+  readonly sendAvatarTest: () => Promise<void>;
   /** You, through every enabled preset, with the skips that keep you out of reports bypassed. */
   readonly testSelf: () => Promise<void>;
   /** Everyone in your instance right now, checked without sending anything. */
@@ -88,9 +90,10 @@ export class ReportPanel {
         // Buttons with hover text rather than paragraphs: what each one does fits in its label,
         // and a moderator opening this tab mid-shift is looking for a control, not a briefing.
         //
-        // A grid rather than a row, so three buttons are three equal columns that become one
-        // column when the card is narrow — a plain row wrapped two-then-one, which reads as two
-        // groups that mean something.
+        // A grid rather than a row, so the buttons are equal columns that halve and then stack
+        // as the card narrows — a plain row wrapped unevenly, which reads as groups that mean
+        // something. Two columns rather than four, because these labels are sentences: four
+        // across a half-width card truncates every one of them.
         k.grid([
           k.button({
             label: 'Test me',
@@ -111,7 +114,13 @@ export class ReportPanel {
             title: 'Replays the last player VRCNext recorded through every enabled preset and sends the reports to their channels. Works with VRChat closed.',
             onClick: () => { void this.#deps.sendTest(); },
           }),
-        ], { min: 150, maxColumns: 3 }),
+          k.button({
+            label: 'Replay last avatar switch',
+            icon: 'face',
+            title: 'Reports the last player VRCNext recorded as though they had just switched into the avatar they are wearing, and sends it to the channels. Only presets that watch avatar changes and set a rank floor take part, since those are the ones a real switch would reach. Works with VRChat closed.',
+            onClick: () => { void this.#deps.sendAvatarTest(); },
+          }),
+        ], { min: 150, maxColumns: 2 }),
       ],
     });
     tab.append(k.layout(k.pair(this.#status, actions), this.#list));

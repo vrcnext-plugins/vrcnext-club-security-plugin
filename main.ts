@@ -92,6 +92,7 @@ class ClubSecurity {
     this.#panel = new ReportPanel(ctx, {
       currentInstance: () => this.#instance,
       sendTest: () => this.#sendTest(),
+      sendAvatarTest: () => this.#sendAvatarTest(),
       testSelf: () => this.#testSelf(),
       checkEveryoneHere: () => this.#checkEveryoneHere(),
       onVisibility: (visible) => {
@@ -247,23 +248,37 @@ class ClubSecurity {
     const presets = this.#presetsFor(joiner, instance).filter((p) => p.watchAvatarChanges);
     if (presets.length === 0) return;
     try {
-      const facts = await collectAvatarFacts(this.#ctx.vrchat, joiner, instance, {
-        signal: this.#ctx.signal,
-        onImages: (note) => { this.#ctx.logger.debug(note); },
-        extraApiRequests: this.#ctx.settings.get('allowExtraApiRequests'),
-      });
-      this.#ctx.logger.info(`${joiner.name} switched avatar: ${avatarLine(facts)}`);
-      for (const preset of presets) {
-        const evaluation = evaluate(preset, facts, { only: AVATAR_CHECKS });
-        if (evaluation.checks.length === 0) {
-          this.#ctx.logger.debug(`Preset "${preset.name}" sets no avatar rank floor, so the switch is not reported.`);
-          continue;
-        }
-        await this.#send({ at: Date.now(), kind: 'avatar', preset, joiner, instance, facts, evaluation });
-      }
+      await this.#reportAvatar(joiner, instance, presets);
     } catch (error) {
       this.#ctx.logger.error(`Avatar change for ${joiner.name} could not be checked: ${String(error)}`);
     }
+  }
+
+  /**
+   * The avatar half of a report: what they are wearing, judged, and sent.
+   *
+   * Shared with the tab's avatar button so the two cannot drift. Returns how many presets had
+   * something to say, which is the difference between "reported" and "nothing to check" and is
+   * the only part of this a button has to phrase differently from a live switch.
+   */
+  async #reportAvatar(joiner: Joiner, instance: VrcInstance, presets: readonly Preset[]): Promise<number> {
+    const facts = await collectAvatarFacts(this.#ctx.vrchat, joiner, instance, {
+      signal: this.#ctx.signal,
+      onImages: (note) => { this.#ctx.logger.debug(note); },
+      extraApiRequests: this.#ctx.settings.get('allowExtraApiRequests'),
+    });
+    this.#ctx.logger.info(`${joiner.name}'s avatar: ${avatarLine(facts)}`);
+    let sent = 0;
+    for (const preset of presets) {
+      const evaluation = evaluate(preset, facts, { only: AVATAR_CHECKS });
+      if (evaluation.checks.length === 0) {
+        this.#ctx.logger.debug(`Preset "${preset.name}" sets no avatar rank floor, so the switch is not reported.`);
+        continue;
+      }
+      await this.#send({ at: Date.now(), kind: 'avatar', preset, joiner, instance, facts, evaluation });
+      sent += 1;
+    }
+    return sent;
   }
 
   /** The presets watching this instance that have not whitelisted this player. */
@@ -476,6 +491,44 @@ class ClubSecurity {
     this.#ctx.notifications.toast({
       message: `Replayed ${replay.joiner.name} through ${String(presets.length)} preset(s).`,
     });
+  }
+
+  /**
+   * The last player VRCNext recorded, reported as though they had just switched avatar.
+   *
+   * Nothing stores a switch to replay literally: VRChat's log never mentions someone else
+   * changing avatar, so one exists only while the plugin is watching an instance. What this
+   * exercises is the other report the plugin can send — its own wording, its own channels, and
+   * only the rank checks — against a real player and the avatar they are really wearing.
+   *
+   * Unlike the join buttons it keeps the two conditions a live switch has to meet: the preset
+   * watches avatar changes, and it sets a rank floor for the check to judge against. A test
+   * that ignored them would send reports the live path never would, which is the opposite of
+   * what a test is for — so when either is missing it says which one rather than sending.
+   */
+  async #sendAvatarTest(): Promise<void> {
+    const enabled = this.#testablePresets();
+    if (enabled.length === 0) return;
+    const presets = enabled.filter((preset) => preset.watchAvatarChanges);
+    if (presets.length === 0) {
+      this.#ctx.notifications.toast({ message: 'No enabled preset watches avatar changes.', ok: false });
+      return;
+    }
+    const replay = await lastJoin({
+      vrchat: this.#ctx.vrchat,
+      signal: this.#ctx.signal,
+      currentInstance: this.#instance,
+    });
+    if (replay === undefined) {
+      this.#ctx.notifications.toast({ message: 'VRCNext has not recorded anyone yet; nothing to replay.', ok: false });
+      return;
+    }
+    const { joiner, instance } = replay;
+    if (!replay.located) this.#ctx.logger.warn(`Where ${joiner.name} was last seen is not recorded; the report uses a stand-in instance.`);
+    const sent = await this.#reportAvatar(joiner, instance, presets);
+    this.#ctx.notifications.toast(sent === 0
+      ? { message: 'No preset that watches avatar changes sets an avatar rank floor, so there was nothing to check.', ok: false }
+      : { message: `Reported ${joiner.name}'s avatar through ${String(sent)} preset(s).` });
   }
 }
 
