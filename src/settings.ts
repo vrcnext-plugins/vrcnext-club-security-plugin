@@ -25,6 +25,13 @@ export const DEFAULT_TEMPLATE_VR = [
 /** The title with the club's own count of the person, and the same title without it. */
 const TITLE_WITH_COUNT = '"{name}" {eventText}{{ " for the " + eventOrdinal + " time" if eventOrdinal else "" }}';
 const TITLE_PLAIN = '"{name}" {eventText}';
+/**
+ * The flags of the languages they list, in front of the name.
+ *
+ * Conditional on there being any, so a profile with no languages — or one listing only a sign
+ * language, which has no flag — does not leave the title starting with a space.
+ */
+const TITLE_FLAGS = '{{ languageFlags + " " if languageFlags else "" }}';
 
 /**
  * The report as a Discord embed.
@@ -68,6 +75,10 @@ export const DEFAULT_EMBED = {
     // your account, not theirs, and an all-clear grid of dashes says nothing five times over.
     { name: 'Moderation', value: '{{ "🚫 Blocked" if blocked else "" }}\n{{ "🔇 Muted" if muted else "" }}\n{{ "💬 Chatbox muted" if chatMuted else "" }}\n{{ "🙈 Avatar hidden" if avatarHidden else "" }}\n{{ "🤚 Interaction off" if interactOff else "" }}', inline: true },
     { name: 'Info', value: '{{ "Trust: `" + trustRank + "`" if trustRank else "" }}\n{{ "Status: `" + statusText + "`" if statusText else "" }}\n{{ "Languages: `" + languages + "`" if languages else "" }}\n{{ "Pronouns: `" + pronouns + "`" if pronouns else "" }}\n{{ "Joined: " + joinedSince if joinedSince else "" }}', inline: true },
+    // One line per language with its flag, which the Info field's comma-separated row cannot
+    // show. Off by default: Info already names them, and two fields saying the same thing is
+    // worse than one. Empty for a profile that lists none, which drops the field.
+    { name: 'Languages', value: '{languagesList}', inline: true },
     // The names they went by before this one, each stamped with when VRCNext last saw it. Empty
     // for anyone it only ever saw under one name, which drops the field rather than announcing
     // that nothing happened.
@@ -180,6 +191,9 @@ export const TEMPLATE_VARIABLES = {
   interactOff: 'true when you have turned off interaction with them',
   interactOffEmoji: 'Interaction off as an emoji',
   languages: 'The languages on their profile, comma separated',
+  languageFlags: 'The flags of those languages, space separated — nothing for a profile with none, and sign languages are left out because no flag stands for one',
+  languagesList: 'One line per language, flag first: - 🇩🇪 `Deutsch`',
+  languageCount: 'How many languages they list',
   dateJoined: 'The day their VRChat account was created',
   joinedAgo: 'How long ago they joined VRChat, as plain text',
   joinedSince: 'The same as a Discord relative timestamp',
@@ -226,6 +240,7 @@ const OPTIONAL_FIELDS = [
   ['Moderation', 'showModeration'],
   ['Info', 'showInfo'],
   ['Names', 'showNames'],
+  ['Languages', 'showLanguages'],
 ] as const;
 
 /**
@@ -241,9 +256,10 @@ export function embedOf(preset: Preset): EmbedTemplate {
   const off = new Set<string>(OPTIONAL_FIELDS.filter(([, key]) => !preset.discord[key]).map(([name]) => name));
   return {
     ...base,
+    // Two independent switches, so the title is composed rather than picked from four spellings.
     // Not `{eventOrdinal}` left empty: the count is a whole clause, and a title that reads
     // `"Name" joined for the  ` is worse than one that never counted.
-    ...(preset.discord.showEventCount ? {} : { title: TITLE_PLAIN }),
+    title: `${preset.discord.showLanguageFlags ? TITLE_FLAGS : ''}${preset.discord.showEventCount ? TITLE_WITH_COUNT : TITLE_PLAIN}`,
     ...(off.size === 0 ? {} : { fields: base.fields.filter((field) => !off.has(field.name)) }),
   };
 }
@@ -441,6 +457,20 @@ export const preset = {
         label: 'Add the Names field',
         description: 'The names they went by before this one, newest first. Only names VRCNext itself recorded while you were in an instance with them — VRChat publishes no name history — so it needs the SQL permission and is empty for anyone it has only seen under one name.',
         default: true,
+        hidden: (values) => values['useCustomEmbed'] === true,
+      },
+      showLanguages: {
+        kind: 'boolean',
+        label: 'Add the Languages field',
+        description: 'One line per language they list, with a flag: 🇩🇪 `Deutsch`. Off because the Info field already names them on one row; this is the version with flags. Sign languages have no flag and show their name alone.',
+        default: false,
+        hidden: (values) => values['useCustomEmbed'] === true,
+      },
+      showLanguageFlags: {
+        kind: 'boolean',
+        label: 'Flags in front of the title',
+        description: 'Puts the flags of the languages they list before the name: 🇩🇪 🇺🇸 "Spanjard" joined. Nothing is added for a profile with no languages, or one listing only a sign language, so the title never starts with a stray space.',
+        default: false,
         hidden: (values) => values['useCustomEmbed'] === true,
       },
       showEventCount: {

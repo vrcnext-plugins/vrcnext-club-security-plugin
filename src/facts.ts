@@ -7,7 +7,7 @@
  * parallel and each one degrades to "unknown" on its own rather than holding up the report.
  */
 
-import { TIMELINE_GAP, parseLocation, publicImageUrl, trustRankLabel, trustScore, userEventRows, type ImageSubject, type PerformanceRank, type SqlApi, type TrustScore, type VrcInstance, type VrcModerations, type VrcTimelineEvent, type VrchatApi } from '@vrcnext/plugin-api';
+import { TIMELINE_GAP, parseLocation, publicImageUrl, spokenLanguages, trustRankLabel, trustScore, userEventRows, type ImageSubject, type PerformanceRank, type SpokenLanguage, type SqlApi, type TrustScore, type VrcInstance, type VrcModerations, type VrcTimelineEvent, type VrchatApi } from '@vrcnext/plugin-api';
 
 import { LOG_LINES } from './activity.js';
 import { rejoinIn, UNKNOWN_REJOIN, type Rejoin } from './history.js';
@@ -89,6 +89,13 @@ export interface Facts {
   /** What *you* have done to them. Each flag `undefined` when that list was not loaded. */
   readonly moderations: VrcModerations;
   readonly languages: readonly string[];
+  /**
+   * The same languages with the flag that goes with each, for the compact forms.
+   *
+   * reuse: read straight off the profile payload's own tags, which is where VRCNext renders
+   * its pills from too. Nothing is fetched and nothing is held.
+   */
+  readonly spoken: readonly SpokenLanguage[];
   readonly dateJoined: string;
   readonly lastLogin: string;
   readonly lastActivity: string;
@@ -129,6 +136,7 @@ export const UNKNOWN_FACTS: Facts = {
   seenNames: [],
   moderations: { blocked: undefined, muted: undefined, chatMuted: undefined, avatarHidden: undefined, interactOff: undefined },
   languages: [],
+  spoken: [],
   dateJoined: '',
   lastLogin: '',
   lastActivity: '',
@@ -527,6 +535,7 @@ export async function collectFacts(
     seenNames,
     moderations: vrchat.moderations(joiner.userId),
     languages: user?.languages ?? [],
+    spoken: spokenLanguages(user?.tags),
     dateJoined: user?.dateJoined ?? '',
     lastLogin: user?.lastLogin ?? '',
     lastActivity: user?.lastActivity ?? '',

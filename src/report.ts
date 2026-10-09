@@ -144,6 +144,7 @@ function presetWants(preset: Preset): TemplateValues {
  */
 function profileCards(facts: Facts, joinerName: string): TemplateValues {
   const former = previousNames(facts.seenNames, { current: joinerName });
+  const flags = facts.spoken.flatMap((language) => (language.flag === undefined ? [] : [language.flag]));
   return {
     trustRank: facts.trustRank === '' ? undefined : facts.trustRank,
     meets: facts.meets,
@@ -175,6 +176,15 @@ function profileCards(facts: Facts, joinerName: string): TemplateValues {
     interactOff: facts.moderations.interactOff,
     interactOffEmoji: triState(facts.moderations.interactOff, '🤚', '➖'),
     languages: facts.languages.length === 0 ? undefined : facts.languages.join(', '),
+    // Flags only, space separated, for a title prefix: `🇩🇪 🇺🇸 "Name" joined`. A sign language
+    // contributes nothing here rather than a flag that would name the wrong country.
+    languageFlags: flags.length === 0 ? undefined : flags.join(' '),
+    languageCount: facts.spoken.length,
+    // One line per language, flag first where there is one, so an unflagged sign language reads
+    // as `- ASL` instead of as a row that lost its emoji.
+    languagesList: facts.spoken.length === 0
+      ? undefined
+      : facts.spoken.map((l) => `- ${l.flag === undefined ? '' : `${l.flag} `}\`${l.label}\``).join('\n'),
     dateJoined: facts.dateJoined,
     joinedAgo: facts.dateJoined === '' ? undefined : timeAgo(facts.dateJoined),
     joinedSince: facts.dateJoined === '' ? undefined : discordTimestamp(facts.dateJoined),

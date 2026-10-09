@@ -207,8 +207,9 @@ test('the embed follows the plugin\'s own until a club switches to its own', () 
 test('the optional fields are switches on the plugin\'s embed, and nothing on a custom one', () => {
   const defaults = defaultsFor(presetSchema);
   const names = (p: Preset): readonly string[] => embedOf(p).fields.map((f) => f.name);
-  const all = ['Requirements', 'Avatar', 'Activity', 'Moderation', 'Info', 'Names', 'Recently'];
-  assert.deepEqual(names(defaults), all, 'every one is on out of the box');
+  const all = ['Requirements', 'Avatar', 'Activity', 'Moderation', 'Info', 'Languages', 'Names', 'Recently'];
+  // Languages is the one that is off by default: Info already names them on a row of its own.
+  assert.deepEqual(names(defaults), all.filter((n) => n !== 'Languages'));
 
   const some: Preset = { ...defaults, discord: { ...defaults.discord, showModeration: false, showInfo: false, showNames: false } };
   assert.deepEqual(names(some), ['Requirements', 'Avatar', 'Activity', 'Recently']);
@@ -336,4 +337,35 @@ test('the count in the title is a switch, and nothing on a custom embed', () => 
     discord: { ...off.discord, useCustomEmbed: true, embed: completeEmbed(DEFAULT_EMBED) },
   };
   assert.match(embedOf(custom).title, /eventOrdinal/);
+});
+
+test('languages render as flags in the title and as a list in their own field', () => {
+  const spoken = [
+    { tag: 'language_deu', label: 'Deutsch', flag: '🇩🇪' },
+    { tag: 'language_eng', label: 'English', flag: '🇺🇸' },
+    { tag: 'language_ase', label: 'ASL' },
+  ];
+  const values = reportValues(report({}, { spoken }));
+  assert.equal(values['languageFlags'], '🇩🇪 🇺🇸', 'the sign language has no flag to add');
+  assert.equal(values['languagesList'], '- 🇩🇪 `Deutsch`\n- 🇺🇸 `English`\n- `ASL`');
+  assert.equal(values['languageCount'], 3);
+
+  const defaults = defaultsFor(presetSchema);
+  const on: Preset = { ...defaults, name: 'Club', discord: { ...defaults.discord, showLanguageFlags: true, showLanguages: true } };
+  const embed = renderEmbed(completeEmbed(embedOf(on)), values, { at: new Date(0) });
+  assert.ok(embed !== undefined);
+  assert.equal(embed.title, '🇩🇪 🇺🇸 "Tupper" joined');
+  assert.equal((embed.fields ?? []).find((f) => f.name === 'Languages')?.value, '- 🇩🇪 `Deutsch`\n- 🇺🇸 `English`\n- `ASL`');
+
+  // Off, the title is untouched and the field is gone — and both switches are independent.
+  const off = renderEmbed(completeEmbed(embedOf({ ...defaults, name: 'Club' })), values, { at: new Date(0) });
+  assert.ok(off !== undefined);
+  assert.equal(off.title, '"Tupper" joined');
+  assert.ok(!(off.fields ?? []).some((f) => f.name === 'Languages'));
+
+  // A profile with no languages must not leave the title starting with a space.
+  const flagsOnly: Preset = { ...defaults, name: 'Club', discord: { ...defaults.discord, showLanguageFlags: true } };
+  const silent = renderEmbed(completeEmbed(embedOf(flagsOnly)), reportValues(report()), { at: new Date(0) });
+  assert.ok(silent !== undefined);
+  assert.equal(silent.title, '"Tupper" joined');
 });
