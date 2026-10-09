@@ -139,6 +139,29 @@ test('the activity field is dropped when VRCNext has no history for the player',
   assert.equal((without.fields ?? []).length, 2);
 });
 
+test('the Names field carries the names they used before this one, and nothing when there are none', () => {
+  const now = { name: 'Tupper', firstSeen: '2026-01-01T00:00:00Z', lastSeen: '2026-09-27T10:00:00Z' };
+  const seen = [now, { name: 'tupperware', firstSeen: '2025-01-01T00:00:00Z', lastSeen: '2025-06-01T00:00:00Z' }];
+  const values = reportValues(report({}, { seenNames: seen }));
+  assert.equal(values['nameHistoryText'], '- `tupperware` <t:1748736000:R>');
+  assert.equal(values['previousNames'], 'tupperware');
+  assert.equal(values['nameCount'], 1);
+
+  const embed = renderEmbed(completeEmbed(DEFAULT_EMBED), values, { at: new Date(0) });
+  assert.equal((embed?.fields ?? []).find((f) => f.name === 'Names')?.inline, true);
+
+  // Only ever seen under the name they have now: the field is dropped, not filled with "None".
+  const onlyNow = reportValues(report({}, { seenNames: [now] }));
+  assert.equal(onlyNow['nameHistoryText'], undefined);
+  assert.equal(onlyNow['nameCount'], 0);
+  const plain = renderEmbed(completeEmbed(DEFAULT_EMBED), onlyNow, { at: new Date(0) });
+  assert.ok(!(plain?.fields ?? []).some((f) => f.name === 'Names'));
+
+  // Without the `sql` permission there is no history to have an opinion about, and a count of
+  // zero would claim they have never renamed.
+  assert.equal(reportValues(report())['nameCount'], undefined);
+});
+
 test('a custom template picks its own facts; a broken one falls back and reports', () => {
   const lines = reportLines(report({}, { rejoin: { seenHere: true, lastAt: new Date(Date.now() - 3 * 3_600_000).toISOString() } }), '{name} {{ "is back" if rejoin else "is new" }} {rejoinAgo}\n{inGroupText}');
   assert.deepEqual(lines, ['Tupper is back 3 hours ago', 'Yes']);
@@ -182,13 +205,13 @@ test('the embed follows the plugin\'s own until a club switches to its own', () 
   assert.equal(off.discord.embed.title, 'mine');
 });
 
-test('the three profile cards are switches on the plugin\'s embed, and nothing on a custom one', () => {
+test('the optional fields are switches on the plugin\'s embed, and nothing on a custom one', () => {
   const defaults = defaultsFor(presetSchema);
   const names = (p: Preset): readonly string[] => embedOf(p).fields.map((f) => f.name);
-  assert.deepEqual(names(defaults), ['Requirements', 'Avatar', 'Activity', 'Moderation', 'Info', 'Recently'],
-    'all three are on out of the box');
+  const all = ['Requirements', 'Avatar', 'Activity', 'Moderation', 'Info', 'Names', 'Recently'];
+  assert.deepEqual(names(defaults), all, 'every one is on out of the box');
 
-  const some: Preset = { ...defaults, discord: { ...defaults.discord, showModeration: false, showInfo: false } };
+  const some: Preset = { ...defaults, discord: { ...defaults.discord, showModeration: false, showInfo: false, showNames: false } };
   assert.deepEqual(names(some), ['Requirements', 'Avatar', 'Activity', 'Recently']);
 
   // A club that writes its own embed deletes the field instead; the switches say nothing there.
@@ -196,7 +219,7 @@ test('the three profile cards are switches on the plugin\'s embed, and nothing o
     ...some,
     discord: { ...some.discord, useCustomEmbed: true, embed: completeEmbed(DEFAULT_EMBED) },
   };
-  assert.deepEqual(names(custom), ['Requirements', 'Avatar', 'Activity', 'Moderation', 'Info', 'Recently']);
+  assert.deepEqual(names(custom), all);
 });
 
 /** `requirementsText` is one of the template's values, typed as anything a template may hold. */

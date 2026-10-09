@@ -68,6 +68,10 @@ export const DEFAULT_EMBED = {
     // your account, not theirs, and an all-clear grid of dashes says nothing five times over.
     { name: 'Moderation', value: '{{ "🚫 Blocked" if blocked else "" }}\n{{ "🔇 Muted" if muted else "" }}\n{{ "💬 Chatbox muted" if chatMuted else "" }}\n{{ "🙈 Avatar hidden" if avatarHidden else "" }}\n{{ "🤚 Interaction off" if interactOff else "" }}', inline: true },
     { name: 'Info', value: '{{ "Trust: `" + trustRank + "`" if trustRank else "" }}\n{{ "Status: `" + statusText + "`" if statusText else "" }}\n{{ "Languages: `" + languages + "`" if languages else "" }}\n{{ "Pronouns: `" + pronouns + "`" if pronouns else "" }}\n{{ "Joined: " + joinedSince if joinedSince else "" }}', inline: true },
+    // The names they went by before this one, each stamped with when VRCNext last saw it. Empty
+    // for anyone it only ever saw under one name, which drops the field rather than announcing
+    // that nothing happened.
+    { name: 'Names', value: '{nameHistoryText}', inline: true },
     { name: 'Recently', value: '{logText}', inline: false },
   ],
 } as const;
@@ -162,6 +166,9 @@ export const TEMPLATE_VARIABLES = {
   timeTogether: 'Total time in the same instance, as 5h 12m 49s',
   timeTogetherSeconds: 'The same as a number of seconds',
   dbEntries: "How many rows in VRCNext's database mention them (needs the SQL permission)",
+  nameHistoryText: 'Names they used before this one, as bullet points, each with when it was last seen (needs the SQL permission)',
+  previousNames: 'The same names on one line, comma separated, newest first',
+  nameCount: 'How many other names VRCNext has recorded for them',
   blocked: 'true when you have blocked them',
   blockedEmoji: 'Blocked as an emoji',
   muted: 'true when you have muted them',
@@ -218,6 +225,7 @@ const OPTIONAL_FIELDS = [
   ['Activity', 'showActivity'],
   ['Moderation', 'showModeration'],
   ['Info', 'showInfo'],
+  ['Names', 'showNames'],
 ] as const;
 
 /**
@@ -425,6 +433,13 @@ export const preset = {
         kind: 'boolean',
         label: 'Add the Info field',
         description: 'Trust rank, status, languages, pronouns and when they joined VRChat.',
+        default: true,
+        hidden: (values) => values['useCustomEmbed'] === true,
+      },
+      showNames: {
+        kind: 'boolean',
+        label: 'Add the Names field',
+        description: 'The names they went by before this one, newest first. Only names VRCNext itself recorded while you were in an instance with them — VRChat publishes no name history — so it needs the SQL permission and is empty for anyone it has only seen under one name.',
         default: true,
         hidden: (values) => values['useCustomEmbed'] === true,
       },

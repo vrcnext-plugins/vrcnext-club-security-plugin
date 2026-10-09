@@ -11,6 +11,7 @@ import { TIMELINE_GAP, parseLocation, publicImageUrl, trustRankLabel, trustScore
 
 import { LOG_LINES } from './activity.js';
 import { rejoinIn, UNKNOWN_REJOIN, type Rejoin } from './history.js';
+import type { SeenName } from './names.js';
 
 export interface Joiner {
   readonly name: string;
@@ -77,6 +78,11 @@ export interface Facts {
    * one rather than the oldest of the ten the page returned. `undefined` without `sql`.
    */
   readonly oldestEvent: VrcTimelineEvent | undefined;
+  /**
+   * Every name VRCNext recorded for them, newest use first, the current one included.
+   * `undefined` without the `sql` permission — which is not the same as never having renamed.
+   */
+  readonly seenNames: readonly SeenName[] | undefined;
   /** What *you* have done to them. Each flag `undefined` when that list was not loaded. */
   readonly moderations: VrcModerations;
   readonly languages: readonly string[];
@@ -117,6 +123,7 @@ export const UNKNOWN_FACTS: Facts = {
   dbEntries: undefined,
   seenLocations: undefined,
   oldestEvent: undefined,
+  seenNames: undefined,
   moderations: { blocked: undefined, muted: undefined, chatMuted: undefined, avatarHidden: undefined, interactOff: undefined },
   languages: [],
   dateJoined: '',
@@ -412,6 +419,37 @@ async function oldestEventFor(sql: SqlApi | undefined, userId: string): Promise<
   }
 }
 
+/**
+ * Every name VRCNext ever recorded for this player, newest use first.
+ *
+ * reuse: no payload carries a past name. VRChat publishes no name history, VRCNext keeps one
+ * current `display_name` per user and logs no rename event, so the only record of an old name is
+ * the copy each `event_players` row kept of the name at the time. Grouped in SQLite because the
+ * page has at most ten records to group.
+ *
+ * The timestamps come from `events`, not from `event_players.joined_at`, which is empty on
+ * almost every row. `idx_ep_user` covers the selection, so this is one indexed read.
+ */
+async function namesFor(sql: SqlApi | undefined, userId: string): Promise<readonly SeenName[] | undefined> {
+  if (sql === undefined) return undefined;
+  try {
+    const rows = await sql.rows(
+      'vrcnext',
+      'SELECT p.display_name AS name, min(e.timestamp) AS first_seen, max(e.timestamp) AS last_seen'
+      + ' FROM event_players p JOIN events e ON e.id = p.event_id'
+      + " WHERE p.user_id = ?1 AND p.display_name != '' AND e.timestamp != ''"
+      + ' GROUP BY p.display_name ORDER BY last_seen DESC',
+      [userId],
+    );
+    const text = (row: Readonly<Record<string, unknown>>, key: string): string => (typeof row[key] === 'string' ? row[key] : '');
+    return rows
+      .map((row) => ({ name: text(row, 'name'), firstSeen: text(row, 'first_seen'), lastSeen: text(row, 'last_seen') }))
+      .filter((seen) => seen.name !== '' && seen.lastSeen !== '');
+  } catch {
+    return undefined;
+  }
+}
+
 /** Runs every lookup in parallel and returns whatever arrived before the deadline. */
 export async function collectFacts(
   vrchat: VrchatApi,
@@ -422,7 +460,7 @@ export async function collectFacts(
   if (joiner.userId === '') return UNKNOWN_FACTS;
   const signal = AbortSignal.any([options.signal, AbortSignal.timeout(options.deadlineMs)]);
   const location = instance?.location ?? '';
-  const [user, avatar, groups, timeline, dbEntries, seenLocations, oldestEvent] = await Promise.all([
+  const [user, avatar, groups, timeline, dbEntries, seenLocations, oldestEvent, seenNames] = await Promise.all([
     vrchat.user(joiner.userId, { signal }),
     avatarFacts(vrchat, joiner, { instance, signal, note: options.onImages, extraApiRequests: options.extraApiRequests }).catch(() => undefined),
     options.wantsGroups ? vrchat.userGroups(joiner.userId, { signal }).then((g) => g.map((x) => x.id), () => undefined) : Promise.resolve(undefined),
@@ -430,6 +468,7 @@ export async function collectFacts(
     dbEntriesFor(options.sql, joiner.userId),
     seenLocationsFor(options.sql, joiner.userId),
     oldestEventFor(options.sql, joiner.userId),
+    namesFor(options.sql, joiner.userId),
   ]);
   const timelineGroups = await groupNames(vrchat, timeline, signal);
   const inInstance = instance?.users.find((u) => u.id === joiner.userId);
@@ -475,6 +514,7 @@ export async function collectFacts(
     dbEntries,
     seenLocations,
     oldestEvent,
+    seenNames,
     moderations: vrchat.moderations(joiner.userId),
     languages: user?.languages ?? [],
     dateJoined: user?.dateJoined ?? '',

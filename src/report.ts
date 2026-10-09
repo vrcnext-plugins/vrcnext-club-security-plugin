@@ -25,6 +25,7 @@ import {
 import { activityLog, LOG_LINES, type ActivityLogOptions } from './activity.js';
 import { eventCount } from './events.js';
 import type { Facts, Joiner } from './facts.js';
+import { nameHistory, previousNames } from './names.js';
 import { VERDICT_COLOR, VERDICT_EMOJI, VERDICT_TEXT, type Evaluation } from './requirements.js';
 import { DEFAULT_TEMPLATE, type Preset } from './settings.js';
 
@@ -137,10 +138,12 @@ function presetWants(preset: Preset): TemplateValues {
  * VRCNext has no answer: a row that renders empty is dropped, and "Unknown" in a box is worse
  * than no box.
  *
- * reuse: all of it is on the profile payload VRCNext already sent, except `dbEntries`, which
- * is counted over `ctx.sql` because no payload carries it.
+ * reuse: all of it is on the profile payload VRCNext already sent, except `dbEntries` and the
+ * name history, which come over `ctx.sql` because no payload carries them — VRCNext holds one
+ * current display name per user and logs no rename.
  */
-function profileCards(facts: Facts): TemplateValues {
+function profileCards(facts: Facts, joinerName: string): TemplateValues {
+  const former = previousNames(facts.seenNames, { current: joinerName });
   return {
     trustRank: facts.trustRank === '' ? undefined : facts.trustRank,
     meets: facts.meets,
@@ -156,6 +159,11 @@ function profileCards(facts: Facts): TemplateValues {
     timeTogether: facts.totalTimeSeconds === undefined ? undefined : exactDuration(facts.totalTimeSeconds),
     timeTogetherSeconds: facts.totalTimeSeconds,
     dbEntries: facts.dbEntries,
+    nameHistoryText: former.length === 0 ? undefined : nameHistory(facts.seenNames, { current: joinerName }),
+    previousNames: former.length === 0 ? undefined : former.map((seen) => seen.name).join(', '),
+    // The count of *former* names, so it reads as "renamed twice". Absent rather than 0 without
+    // the `sql` permission, where a zero would claim they have never renamed.
+    nameCount: facts.seenNames === undefined ? undefined : former.length,
     blocked: facts.moderations.blocked,
     blockedEmoji: triState(facts.moderations.blocked, '🚫', '➖'),
     muted: facts.moderations.muted,
@@ -286,7 +294,7 @@ export function reportValues(report: Report): TemplateValues {
       : `#${instance.instanceId}${instance.instanceType === '' ? '' : ` · ${instanceTypeLabel(instance.instanceType)}`}`,
     location: instance.location,
 
-    ...profileCards(facts),
+    ...profileCards(facts, joiner.name),
 
     time: at.toLocaleTimeString(),
     date: at.toLocaleDateString(),
