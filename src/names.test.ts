@@ -7,7 +7,17 @@ import { test } from 'vitest';
 
 import { EMBED_LIMITS } from '@vrcnext/plugin-api';
 
-import { nameHistory, previousNames, type SeenName } from './names.js';
+import type { VrcTimelineEvent } from '@vrcnext/plugin-api';
+
+import { knownNames, nameHistory, namesFromTimeline, previousNames, type SeenName } from './names.js';
+
+/** An `instance_join` record as VRCNext hands it over, with who was in it. */
+function instance(at: string, players: readonly (readonly [string, string])[]): VrcTimelineEvent {
+  return {
+    type: 'instance_join', timestamp: at, location: '', worldName: 'Club',
+    players: players.map(([userId, displayName]) => ({ userId, displayName, joinedAts: [at], leftAts: [] })),
+  };
+}
 
 function seen(name: string, lastSeen: string, firstSeen = lastSeen): SeenName {
   return { name, firstSeen, lastSeen };
@@ -66,4 +76,40 @@ test('a prolific renamer fits the field, with a gap row for the rest', () => {
 
 test('a name padded with spaces still counts as the current one', () => {
   assert.deepEqual(previousNames([seen(' Bluscream ', '2026-01-01T00:00:00.000Z')], { current: 'Bluscream' }), []);
+});
+
+test('without the database, the names come from the players on the timeline records', () => {
+  const names = namesFromTimeline([
+    instance('2026-09-01T00:00:00Z', [['usr_1', 'Tupper'], ['usr_2', 'Someone Else']]),
+    instance('2025-03-01T00:00:00Z', [['usr_1', 'tupperware']]),
+  ], 'usr_1');
+  assert.deepEqual(previousNames(names, { current: 'Tupper' }).map((s) => s.name), ['tupperware']);
+});
+
+test('the same name across records keeps the widest window it was seen in', () => {
+  const names = namesFromTimeline([
+    instance('2026-09-01T00:00:00Z', [['usr_1', 'old']]),
+    instance('2025-03-01T00:00:00Z', [['usr_1', 'old']]),
+    instance('2026-01-01T00:00:00Z', [['usr_1', 'old']]),
+  ], 'usr_1');
+  assert.equal(names.length, 1);
+  assert.deepEqual(
+    [names[0]?.firstSeen, names[0]?.lastSeen],
+    ['2025-03-01T00:00:00Z', '2026-09-01T00:00:00Z'],
+  );
+});
+
+test('a record with no players, and one about somebody else, contribute nothing', () => {
+  assert.deepEqual(namesFromTimeline([{ type: 'friend_avatar', timestamp: '2026-09-01T00:00:00Z', location: '', worldName: '' }], 'usr_1'), []);
+  assert.deepEqual(namesFromTimeline([instance('2026-09-01T00:00:00Z', [['usr_2', 'Else']])], 'usr_1'), []);
+  assert.deepEqual(namesFromTimeline(undefined, 'usr_1'), []);
+});
+
+test('the database answers instead of the timeline when it was allowed to', () => {
+  const fromTimeline = namesFromTimeline([instance('2026-09-01T00:00:00Z', [['usr_1', 'recent']])], 'usr_1');
+  const fromDatabase = [seen('all of them', '2026-09-01T00:00:00Z')];
+  // It selects over every record, so what the timeline holds is already in it.
+  assert.deepEqual(knownNames(fromDatabase, fromTimeline), fromDatabase);
+  // Refused or absent: the ten records are all there is, and they are better than nothing.
+  assert.deepEqual(knownNames(undefined, fromTimeline), fromTimeline);
 });

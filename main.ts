@@ -9,7 +9,7 @@
  * Compare with `plugin.json`: every category used here is declared there.
  */
 
-import { definePlugin, type PluginContext, type PluginId, type VrcInstance } from '@vrcnext/plugin-api';
+import { definePlugin, type PluginContext, type PluginId, type SqlApi, type VrcInstance } from '@vrcnext/plugin-api';
 
 import { collectAvatarFacts, collectFacts, type Joiner } from './src/facts.js';
 import { matchingPresets, presetMatches } from './src/filters.js';
@@ -111,10 +111,38 @@ class ClubSecurity {
     });
     this.#panel.install();
     void this.#refreshInstance();
-    this.#ctx.settings.onChange(() => { this.#syncTimer(); });
+    this.#ctx.settings.onChange(() => { this.#syncTimer(); void this.#syncDatabaseGrant(); });
     this.#syncTimer();
     this.#ctx.disposables.add(() => { this.#stopTimer(); });
     this.#ctx.logger.info(`Club Security v${this.#ctx.version} watching for joins.`);
+  }
+
+  /**
+   * Read-only SQL, but only once the user has actually asked for it.
+   *
+   * `sql` is optional rather than declared, so the plugin never reaches for the database on its
+   * own: a report without it is a shorter report, not a broken one. Checking the grant as well as
+   * the switch matters because a grant can be revoked from the permissions panel while the switch
+   * stays on — and calling then would throw once per joiner.
+   */
+  get #sql(): SqlApi | undefined {
+    if (!this.#ctx.settings.get('useDatabase')) return undefined;
+    return this.#ctx.permissions.has('sql') ? this.#ctx.sql : undefined;
+  }
+
+  /**
+   * Asks for the database permission when the switch goes on, and puts it back if the answer is no.
+   *
+   * The switch is the question, so a refusal has to un-ask it: left on, the settings page would
+   * claim an access the user has just declined, and every report would quietly take the short
+   * path while saying it took the long one.
+   */
+  async #syncDatabaseGrant(): Promise<void> {
+    if (!this.#ctx.settings.get('useDatabase') || this.#ctx.permissions.has('sql')) return;
+    const granted = await this.#ctx.permissions.request('sql').catch(() => false);
+    if (granted) return;
+    await this.#ctx.settings.set('useDatabase', false).catch(() => undefined);
+    this.#ctx.logger.info('Database access declined; reports will use what the page already holds.');
   }
 
   /**
@@ -317,7 +345,7 @@ class ClubSecurity {
       deadlineMs,
       signal: this.#ctx.signal,
       wantsGroups: presets.some((p) => p.requiredGroup !== ''),
-      sql: this.#ctx.sql,
+      sql: this.#sql,
     });
     for (const preset of presets) {
       await this.#send({ at: Date.now(), kind: 'join', preset, joiner, instance, facts, evaluation: evaluate(preset, facts) });
@@ -362,7 +390,7 @@ class ClubSecurity {
       deadlineMs: this.#ctx.settings.get('collectTimeoutSecs') * 1000,
       signal: this.#ctx.signal,
       wantsGroups: presets.some((p) => p.requiredGroup !== ''),
-      sql: this.#ctx.sql,
+      sql: this.#sql,
     });
     for (const preset of presets) {
       if (!presetMatches(preset, instance)) {

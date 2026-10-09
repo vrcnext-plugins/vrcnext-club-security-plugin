@@ -11,7 +11,7 @@ import { TIMELINE_GAP, parseLocation, publicImageUrl, trustRankLabel, trustScore
 
 import { LOG_LINES } from './activity.js';
 import { rejoinIn, UNKNOWN_REJOIN, type Rejoin } from './history.js';
-import type { SeenName } from './names.js';
+import { knownNames, namesFromTimeline, type SeenName } from './names.js';
 
 export interface Joiner {
   readonly name: string;
@@ -79,10 +79,13 @@ export interface Facts {
    */
   readonly oldestEvent: VrcTimelineEvent | undefined;
   /**
-   * Every name VRCNext recorded for them, newest use first, the current one included.
-   * `undefined` without the `sql` permission — which is not the same as never having renamed.
+   * Names VRCNext recorded for them, the current one included.
+   *
+   * From the database when the club granted `sql`, which is every record there is; otherwise
+   * from the players on the ten timeline records, which is most renames but no one's whole
+   * history. Empty is "none that VRCNext saw", never "they have never renamed".
    */
-  readonly seenNames: readonly SeenName[] | undefined;
+  readonly seenNames: readonly SeenName[];
   /** What *you* have done to them. Each flag `undefined` when that list was not loaded. */
   readonly moderations: VrcModerations;
   readonly languages: readonly string[];
@@ -123,7 +126,7 @@ export const UNKNOWN_FACTS: Facts = {
   dbEntries: undefined,
   seenLocations: undefined,
   oldestEvent: undefined,
-  seenNames: undefined,
+  seenNames: [],
   moderations: { blocked: undefined, muted: undefined, chatMuted: undefined, avatarHidden: undefined, interactOff: undefined },
   languages: [],
   dateJoined: '',
@@ -150,13 +153,17 @@ export interface CollectOptions {
   /** Told what each picture's address was and which one was used. */
   readonly onImages?: (note: string) => void;
   /**
-   * Read-only SQL, for the one number the page cannot answer.
+   * Read-only SQL, for the facts the page is holding only a window of.
    *
    * reuse: `getTimelineForUser` is hardcoded to ten records (`TimelineController.cs`), so how
-   * many records exist at all is not a question any page state or push can answer at any cost.
-   * Absent when the club has not granted `sql`, and the row is then left out rather than guessed.
+   * many records exist at all, which instance was the first, and every name a player has gone by
+   * are not questions any page state or push can answer at any cost.
+   *
+   * `undefined` unless the user turned the switch on *and* granted the optional permission. Each
+   * fact behind it then falls back to the ten records rather than disappearing — a shorter
+   * answer, not a missing one.
    */
-  readonly sql?: SqlApi;
+  readonly sql?: SqlApi | undefined;
 }
 
 /**
@@ -460,7 +467,7 @@ export async function collectFacts(
   if (joiner.userId === '') return UNKNOWN_FACTS;
   const signal = AbortSignal.any([options.signal, AbortSignal.timeout(options.deadlineMs)]);
   const location = instance?.location ?? '';
-  const [user, avatar, groups, timeline, dbEntries, seenLocations, oldestEvent, seenNames] = await Promise.all([
+  const [user, avatar, groups, timeline, dbEntries, seenLocations, oldestEvent, databaseNames] = await Promise.all([
     vrchat.user(joiner.userId, { signal }),
     avatarFacts(vrchat, joiner, { instance, signal, note: options.onImages, extraApiRequests: options.extraApiRequests }).catch(() => undefined),
     options.wantsGroups ? vrchat.userGroups(joiner.userId, { signal }).then((g) => g.map((x) => x.id), () => undefined) : Promise.resolve(undefined),
@@ -471,6 +478,9 @@ export async function collectFacts(
     namesFor(options.sql, joiner.userId),
   ]);
   const timelineGroups = await groupNames(vrchat, timeline, signal);
+  // The database answers over every record; the timeline over the ten it returned. Without
+  // the `sql` grant the second is all there is, and it is most of what matters.
+  const seenNames = knownNames(databaseNames, namesFromTimeline(timeline, joiner.userId));
   const inInstance = instance?.users.find((u) => u.id === joiner.userId);
   return {
     ageVerified: user?.ageVerified ?? inInstance?.ageVerified,

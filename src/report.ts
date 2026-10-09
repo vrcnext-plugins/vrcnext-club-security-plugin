@@ -161,9 +161,9 @@ function profileCards(facts: Facts, joinerName: string): TemplateValues {
     dbEntries: facts.dbEntries,
     nameHistoryText: former.length === 0 ? undefined : nameHistory(facts.seenNames, { current: joinerName }),
     previousNames: former.length === 0 ? undefined : former.map((seen) => seen.name).join(', '),
-    // The count of *former* names, so it reads as "renamed twice". Absent rather than 0 without
-    // the `sql` permission, where a zero would claim they have never renamed.
-    nameCount: facts.seenNames === undefined ? undefined : former.length,
+    // The count of *former* names, so it reads as "renamed twice". Zero is "none VRCNext saw",
+    // which is as much as either source can say — see the Names caveat on the site.
+    nameCount: former.length,
     blocked: facts.moderations.blocked,
     blockedEmoji: triState(facts.moderations.blocked, '🚫', '➖'),
     muted: facts.moderations.muted,

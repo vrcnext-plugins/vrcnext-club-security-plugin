@@ -157,9 +157,8 @@ test('the Names field carries the names they used before this one, and nothing w
   const plain = renderEmbed(completeEmbed(DEFAULT_EMBED), onlyNow, { at: new Date(0) });
   assert.ok(!(plain?.fields ?? []).some((f) => f.name === 'Names'));
 
-  // Without the `sql` permission there is no history to have an opinion about, and a count of
-  // zero would claim they have never renamed.
-  assert.equal(reportValues(report())['nameCount'], undefined);
+  // Nothing recorded at all still counts as zero other names: it is what both sources can say.
+  assert.equal(reportValues(report())['nameCount'], 0);
 });
 
 test('a custom template picks its own facts; a broken one falls back and reports', () => {

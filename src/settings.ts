@@ -497,6 +497,17 @@ export const settings = {
     integer: true,
     unit: 's',
   },
+  useDatabase: {
+    kind: 'boolean',
+    label: "Read VRCNext's database for the full picture",
+    description:
+      'Off, a report uses only what VRCNext already holds in the page: the ten records it answers '
+      + 'with per player, which cover most renames and the recent history but nobody\'s whole one. '
+      + 'On, the same facts are read from VRCNext\'s own database instead — every instance it ever '
+      + 'recorded, the real first time you met, and the complete list of names. Read-only, on this '
+      + 'machine, and VRChat is never asked. Turning it on asks for the database permission once.',
+    default: false,
+  },
   allowExtraApiRequests: {
     kind: 'boolean',
     label: 'Allow making extra API requests',

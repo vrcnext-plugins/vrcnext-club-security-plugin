@@ -12,7 +12,7 @@
  * (`["2026-09-23T10:15:55.0000000Z"]`), so it cannot be ordered or parsed as a date.
  */
 
-import { EMBED_LIMITS, discordTimestamp, fitLines } from '@vrcnext/plugin-api';
+import { EMBED_LIMITS, discordTimestamp, fitLines, type VrcTimelineEvent } from '@vrcnext/plugin-api';
 
 /** One name, with the window VRCNext saw it in. */
 export interface SeenName {
@@ -75,6 +75,56 @@ export function nameHistory(
   // so it drops the line *above* it and the row survives the trim it causes.
   const withGap = fitLines([...kept, GAP_LINE], EMBED_LIMITS.fieldValue, { gap: GAP_LINE });
   return (withGap.length === 0 ? kept : withGap).join('\n');
+}
+
+/**
+ * The names in the records the page already handed over — the free half of the history.
+ *
+ * Every `instance_join` record carries the players who were in it *and the name each one had at
+ * the time*, so the timeline a report already fetched for the rejoin check is itself a short
+ * name history. It reaches only as far as the ten records VRCNext answers with, which on this
+ * owner's database reveals a rename for 518 of the 751 players who have ever renamed — most of
+ * them, and none of them completely. {@link nameHistory} prefers the database where it may read
+ * it and falls back to this.
+ *
+ * The date is the player's own arrival rather than the record's timestamp: the two differ for a
+ * long instance, and the arrival is when the name was actually observed.
+ */
+export function namesFromTimeline(
+  events: readonly VrcTimelineEvent[] | undefined,
+  userId: string,
+): readonly SeenName[] {
+  const byName = new Map<string, { first: string; last: string }>();
+  const widen = (name: string, at: string): void => {
+    const seen = byName.get(name);
+    if (seen === undefined) byName.set(name, { first: at, last: at });
+    else {
+      if (at < seen.first) seen.first = at;
+      if (at > seen.last) seen.last = at;
+    }
+  };
+  for (const event of events ?? []) {
+    const mine = (event.players ?? []).filter((p) => p.userId === userId && p.displayName !== '');
+    for (const player of mine) {
+      const at = player.joinedAts[0] ?? event.timestamp;
+      if (at !== '') widen(player.displayName, at);
+    }
+  }
+  return [...byName].map(([name, when]) => ({ name, firstSeen: when.first, lastSeen: when.last }));
+}
+
+/**
+ * The database's answer where there is one, the timeline's where there is not.
+ *
+ * Not merged: the database query selects over every record there is, so whatever the timeline
+ * holds is already in it. Merging would only risk two entries for one name whose two sources
+ * dated it differently.
+ */
+export function knownNames(
+  fromDatabase: readonly SeenName[] | undefined,
+  fromTimeline: readonly SeenName[],
+): readonly SeenName[] {
+  return fromDatabase ?? fromTimeline;
 }
 
 /**
