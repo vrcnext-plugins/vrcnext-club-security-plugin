@@ -196,7 +196,10 @@ test('the embed follows the plugin\'s own until a club switches to its own', () 
   const defaults = defaultsFor(presetSchema);
   const mine = { ...completeEmbed(DEFAULT_EMBED), title: 'mine' };
   const off: Preset = { ...defaults, discord: { ...defaults.discord, useCustomEmbed: false, embed: mine } };
-  assert.equal(embedOf(off).title, DEFAULT_EMBED.title, 'off means the plugin\'s wording');
+  // `endsWith` rather than equality: the plugin's own title is composed, so the switches that
+  // are on by default prefix it. What this is testing is whose wording it is, not that nothing
+  // was prefixed.
+  assert.ok(embedOf(off).title.endsWith(DEFAULT_EMBED.title), 'off means the plugin\'s wording');
 
   const on: Preset = { ...off, discord: { ...off.discord, useCustomEmbed: true } };
   assert.equal(embedOf(on).title, 'mine');
@@ -328,8 +331,9 @@ test('the count in the title is a switch, and nothing on a custom embed', () => 
   const defaults = defaultsFor(presetSchema);
   assert.match(embedOf(defaults).title, /eventOrdinal/, 'counted out of the box');
 
-  // Not the variable left empty: the count is a whole clause, trailing space and all.
-  const off: Preset = { ...defaults, discord: { ...defaults.discord, showEventCount: false } };
+  // Not the variable left empty: the count is a whole clause, trailing space and all. The flags
+  // are switched off too, so what is left is the count's own contribution and nothing else.
+  const off: Preset = { ...defaults, discord: { ...defaults.discord, showEventCount: false, showLanguageFlags: false } };
   assert.equal(embedOf(off).title, '"{name}" {eventText}');
 
   const custom: Preset = {
@@ -357,8 +361,11 @@ test('languages render as flags in the title and as a list in their own field', 
   assert.equal(embed.title, '🇩🇪 🇺🇸 "Tupper" joined');
   assert.equal((embed.fields ?? []).find((f) => f.name === 'Languages')?.value, '- 🇩🇪 `Deutsch`\n- 🇺🇸 `English`\n- `ASL`');
 
-  // Off, the title is untouched and the field is gone — and both switches are independent.
-  const off = renderEmbed(completeEmbed(embedOf({ ...defaults, name: 'Club' })), values, { at: new Date(0) });
+  // Off, the title is untouched and the field is gone — and both switches are independent. Both
+  // are named here rather than taken from the defaults, so this still tests "off" after either
+  // default changes.
+  const bothOff: Preset = { ...defaults, name: 'Club', discord: { ...defaults.discord, showLanguageFlags: false, showLanguages: false } };
+  const off = renderEmbed(completeEmbed(embedOf(bothOff)), values, { at: new Date(0) });
   assert.ok(off !== undefined);
   assert.equal(off.title, '"Tupper" joined');
   assert.ok(!(off.fields ?? []).some((f) => f.name === 'Languages'));

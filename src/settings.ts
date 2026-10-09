@@ -470,7 +470,7 @@ export const preset = {
         kind: 'boolean',
         label: 'Flags in front of the title',
         description: 'Puts the flags of the languages they list before the name: 🇩🇪 🇺🇸 "Spanjard" joined. Nothing is added for a profile with no languages, or one listing only a sign language, so the title never starts with a stray space.',
-        default: false,
+        default: true,
         hidden: (values) => values['useCustomEmbed'] === true,
       },
       showEventCount: {
