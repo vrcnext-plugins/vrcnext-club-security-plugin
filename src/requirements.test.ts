@@ -119,7 +119,7 @@ test('an avatar switch into an unknown rank is a warning, and a good one is stil
 
   const unknown = evaluate(watching, facts({ pcRank: '', questRank: '' }), { only: AVATAR_CHECKS });
   assert.equal(unknown.verdict, 'unverified', 'a rank VRChat did not give is not a pass');
-  assert.deepEqual(unknown.checks.map((c) => c.detail), ['rank unknown'], 'and the age and group checks stay out of it');
+  assert.deepEqual(unknown.checks.map((c) => c.detail), ['unknown'], 'and the age and group checks stay out of it');
 
   const good = evaluate(watching, facts({ pcRank: 'Excellent' }), { only: AVATAR_CHECKS });
   assert.equal(good.verdict, 'met');

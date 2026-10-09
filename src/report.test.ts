@@ -80,7 +80,7 @@ test('verdict variables follow the worst check', () => {
   assert.equal(values['failedText'], 'PC avatar rank (VeryPoor, needs Medium or better)');
   const unknown = reportValues(report({}, { pcRank: '' }));
   assert.deepEqual([unknown['result'], unknown['resultColor']], ['unverified', 'orange']);
-  assert.equal(unknown['unverifiedText'], 'PC avatar rank (rank unknown)');
+  assert.equal(unknown['unverifiedText'], 'PC avatar rank (unknown)');
 });
 
 test('the default embed renders with the verdict colour and the avatar thumbnail', () => {

@@ -88,7 +88,9 @@ function rankCheck(key: 'pcRank' | 'questRank' | 'iosRank', label: string, rank:
   const have = rankIndex(rank);
   const want = rankIndex(minimum);
   if (have === undefined || want === undefined) {
-    return { key, label, short: `${platform} unknown`, verdict: 'unverified', detail: 'rank unknown' };
+    // Just `unknown`: the label this sits behind already says which rank it is, so `PC avatar
+    // rank: rank unknown` said it twice.
+    return { key, label, short: `${platform} unknown`, verdict: 'unverified', detail: 'unknown' };
   }
   const short = `${platform} ${rankLabel(rank)}`;
   return have <= want
